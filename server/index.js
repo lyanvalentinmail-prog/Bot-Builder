@@ -23,7 +23,7 @@ server.listen(PORT, HOST, () => {
   console.log(`  📁 Datos: ${DATA_DIR}`);
   if (!IS_PROD) console.log('  🖥️  Interfaz de desarrollo: http://localhost:5173');
   if (IS_SERVERLESS) {
-    console.log('  ☁️  Modo serverless: WhatsApp y Teams reales deshabilitados\n');
+    console.log('  ☁️  Modo serverless: WhatsApp real deshabilitado\n');
   } else if (EPHEMERAL_DATA) {
     console.log(
       '  ⚠️  Sin disco persistente: los bots y la sesión de WhatsApp se pierden al reiniciar.',

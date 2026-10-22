@@ -57,7 +57,7 @@ const starterCommands = () => [
       type: 'text',
       text:
         '🤖 *{{bot}}*\n\nSoy un asistente automático creado con BotForge.\n' +
-        'Puedo responder en WhatsApp y Microsoft Teams al instante.',
+        'Respondo en este grupo de WhatsApp al instante.',
     },
   }),
 ];

@@ -87,7 +87,7 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
     try {
       await api.del(`/bots/${bot.id}`);
       toast.notify('Bot eliminado');
-      navigate('/');
+      navigate('/bots');
     } catch (error) {
       notify(error.message, 'error');
     }
@@ -100,7 +100,7 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
           <CardHeader
             icon="bot"
             title="Identidad del bot"
-            subtitle="Cómo se presenta en WhatsApp y Teams."
+            subtitle="Cómo se presenta en el grupo de WhatsApp."
             actions={
               <Button size="sm" icon="check" onClick={saveGeneral} loading={savingGeneral} disabled={!generalDirty}>
                 Guardar
@@ -184,10 +184,10 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
                 label="Marcar mensajes como leídos"
               />
               <Toggle
-                checked={settings.ignoreGroups}
-                onChange={(value) => update({ ignoreGroups: value })}
-                label="Ignorar grupos"
-                description="Los grupos no reciben respuestas del bot."
+                checked={settings.requireMention}
+                onChange={(value) => update({ requireMention: value })}
+                label="Responder solo si mencionan al bot"
+                description="Los mensajes privados se ignoran siempre: este bot vive en grupos."
               />
             </div>
           </div>
@@ -259,7 +259,7 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
             <Button variant="secondary" icon="copy" onClick={duplicate} loading={duplicating}>
               Duplicar bot
             </Button>
-            <Button variant="ghost" icon="upload" onClick={() => navigate('/')}>
+            <Button variant="ghost" icon="upload" onClick={() => navigate('/bots')}>
               Importar desde el inicio
             </Button>
           </div>
@@ -303,10 +303,6 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
           <div className="kv">
             <span>Motor WhatsApp</span>
             <strong>Baileys</strong>
-          </div>
-          <div className="kv">
-            <span>Motor Teams</span>
-            <strong>Bot Framework v4</strong>
           </div>
           <div className="kv">
             <span>Mensajes procesados</span>

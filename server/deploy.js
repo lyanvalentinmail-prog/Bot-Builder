@@ -18,11 +18,11 @@ export function deployInfo({
 
   const hints = {
     server:
-      'Servidor persistente con disco: podés vincular WhatsApp por QR o código y activar el canal de Teams.',
+      'Servidor persistente con disco: podés vincular WhatsApp por QR o código y usar el bot en tus grupos.',
     ephemeral:
       'Estás en un plan sin disco persistente (por ejemplo, Render Free): el editor, el simulador y WhatsApp funcionan mientras el servicio está despierto, pero los bots y la sesión de WhatsApp se borran al reiniciar o redeployar. Para producción agregá un disco persistente y DATA_DIR (ver DEPLOY.md).',
     serverless:
-      'Entorno serverless (Vercel): el editor y el simulador funcionan, pero WhatsApp y Teams reales necesitan un servidor persistente con disco (Render, Railway, Fly.io o un VPS).',
+      'Entorno serverless (Vercel): el editor y el simulador funcionan, pero WhatsApp real necesita un servidor persistente con disco (Render, Railway, Fly.io o un VPS).',
   };
 
   return {

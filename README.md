@@ -1,6 +1,6 @@
 # ⚡ BotForge
 
-**Creador de bots personalizados para WhatsApp y Microsoft Teams, sin escribir código.**
+**Creador de bots para grupos de WhatsApp, sin escribir código.**
 
 BotForge es una aplicación web completa (frontend + backend + motores de mensajería) donde podés:
 
@@ -10,7 +10,9 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 - ✍️ Crear y reutilizar **plantillas de texto** (`{{texto:horario}}`) con variables dinámicas (`{{nombre}}`, `{{hora}}`, `{{lista_comandos}}`…).
 - 🎛️ Configurar respuestas de texto, frases al azar, imágenes con texto, **botones**, retardo de escritura y edición del mensaje después de enviarlo.
 - 📱 **Vincular WhatsApp real por código QR o por código de vinculación de 8 dígitos.**
-- 👥 **Publicar el mismo bot en Microsoft Teams** con credenciales de Azure Bot.
+- 👥 **Especializado en grupos:** el bot responde en grupos y descarta los chats privados.
+- 🛒 **Catálogo de comandos y plugins** instalables con un clic.
+- 📊 **Métricas reales** del servidor: bots, ejecuciones, actividad y grupos detectados.
 - 🧪 Probar todo en un simulador de teléfono antes de conectar nada.
 - 💾 Exportar/importar la configuración y duplicar bots.
 - ☁️ **Blueprints de Render y Vercel** incluidos (`render.yaml` / `vercel.json`), además de Docker.
@@ -23,7 +25,7 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 2. [Instalación rápida](#instalación-rápida)
 3. [Guía de uso](#guía-de-uso)
 4. [WhatsApp: QR y código de vinculación](#whatsapp-qr-y-código-de-vinculación)
-5. [Microsoft Teams paso a paso](#microsoft-teams-paso-a-paso)
+5. [Catálogo, métricas y grupos](#catálogo-métricas-y-grupos)
 6. [Variables disponibles](#variables-disponibles)
 7. [Configuración (.env)](#configuración-env)
 8. [Despliegue (Render / Vercel / Docker)](#despliegue-render--vercel--docker)
@@ -45,7 +47,7 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 ┌──────────▼─────────────┐
 │  API Express + motores │
 │  • Baileys (WhatsApp)  │──▶  WhatsApp Web multidispositivo (QR / pairing)
-│  • Bot Framework v4    │◀──  Microsoft Teams (webhook HTTPS)
+│  • Catálogo + métricas │  plugins instalables, uso real por comando
 │  • Motor de reglas     │  comandos, reacciones, variables, respuestas
 └──────────┬─────────────┘
            │
@@ -53,7 +55,7 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 ```
 
 - **WhatsApp:** el servidor abre una sesión de WhatsApp Web (Baileys) y la mantiene viva. La sesión queda guardada en disco, así que no hay que escanear el QR cada vez.
-- **Teams:** BotForge expone un endpoint (`/api/teams/:botId/messages`) que Microsoft llama mediante el Bot Framework. No requiere túneles si el servidor tiene HTTPS público.
+- **Solo grupos:** el motor descarta los mensajes de chats privados antes de evaluar comandos. Los grupos se leen de la sesión real y se muestran en el panel.
 - **Motor de reglas:** cada mensaje entrante se evalúa contra los comandos y reacciones del bot. Las respuestas se envían con retardos configurables y se reemplazan variables por datos reales.
 
 ---
@@ -88,7 +90,7 @@ npm start          # sirve interfaz + API en http://localhost:3001
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyanvalentinmail-prog/Bot-Builder)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/lyanvalentinmail-prog/Bot-Builder)
 
-| Opción | Incluye | WhatsApp / Teams reales | Persistencia |
+| Opción | Incluye | WhatsApp real | Persistencia |
 | --- | --- | --- | --- |
 | **Render Free** (`render.yaml`) | App completa, sin tarjeta | ⚠️ Mientras está despierto | Efímera |
 | **Render + disco** (2 pasos) | App completa 24/7 | ✅ | ✅ 1 GB |
@@ -102,7 +104,7 @@ npm start          # sirve interfaz + API en http://localhost:3001
 - Para un bot 24/7 hay que pasar a `plan: 0.5c-512mb` y descomentar el bloque `disk:` — está preparado en `render.yaml` y explicado en [DEPLOY.md](./DEPLOY.md#a2--plan-con-disco-bot-247-us-7mes).
 - ¿Preferís crearlo a mano? Los pasos están en [A3 · Sin blueprint](./DEPLOY.md#a3--sin-blueprint-todo-a-mano).
 
-**Vercel (demo/editor):** importá el repo y desplegá. La función `api/[...route].js` atiende la API (datos en `/tmp`, sin persistencia) y la interfaz avisa que WhatsApp/Teams reales necesitan un servidor persistente.
+**Vercel (demo/editor):** importá el repo y desplegá. La función `api/[...route].js` atiende la API (datos en `/tmp`, sin persistencia) y la interfaz avisa que WhatsApp real necesita un servidor persistente.
 
 **Vercel + Render (backend real, token oculto):** desplegá primero Render y en Vercel definí `BACKEND_URL` y `BACKEND_TOKEN` (variables de servidor). Vercel proxea `/api` a Render y agrega el token del lado servidor, sin exponerlo al navegador.
 
@@ -114,7 +116,7 @@ npm start          # sirve interfaz + API en http://localhost:3001
 
 ### 1. Crear un bot
 
-En **Mis bots → Nuevo bot** elegí una plantilla:
+En **Registrar** elegí una plantilla:
 
 | Plantilla | Incluye |
 | --- | --- |
@@ -132,7 +134,7 @@ Cada comando tiene:
 - **Disparador** y **alias** (`menu`, `help`, `ayuda`).
 - **Tipo de coincidencia:** comando con prefijo, frase exacta, empieza con, contiene, regex o cualquier mensaje.
   - El **prefijo** solo se exige en los comandos de tipo «comando». Las frases naturales («exacto», «empieza con», «contiene») funcionan con o sin prefijo.
-- **Alcance:** todos los chats, solo privados o solo grupos.
+- **Alcance:** todos los mensajes del grupo (los privados nunca se procesan).
 - **Enfriamiento:** evita respuestas repetidas en segundos.
 - **Reacción:** emoji opcional que se aplica al mensaje recibido (se puede quitar después de N segundos).
 - **Respuesta:** texto, frase al azar, imagen con texto, botones o solo reacción.
@@ -142,13 +144,13 @@ El botón **Probar** ejecuta el motor real contra el comando que estás editando
 
 ### 3. Reacciones
 
-- **Reacción automática:** elegís varios emojis, la probabilidad (0–100 %), el alcance (todos / privados / grupos), si también reacciona a comandos y si se quita luego de N segundos.
+- **Reacción automática:** elegís varios emojis, la probabilidad (0–100 %), el alcance (todos / grupos), si también reacciona a comandos y si se quita luego de N segundos.
 - **Reacciones personalizadas:** reglas con nombre, emoji y condición:
   - contiene palabras clave (`gracias, genial`)
   - cuando se usa un comando (`menu, ping`)
   - todos los mensajes
   - expresión regular
-  - solo privados / solo grupos
+  - solo grupos
   - cuando mencionan al bot
 
 WhatsApp reemplaza la reacción anterior: el bot envía **una** reacción por mensaje (se prioriza la del comando).
@@ -159,7 +161,7 @@ Guardá fragmentos reutilizables (horarios, dirección, medios de pago…) y usa
 
 ### 5. Ajustes
 
-Prefijo, exigir prefijo, distinguir mayúsculas, ignorar grupos, acuses de lectura, aviso de comando desconocido, respuesta de respaldo, bienvenida al primer contacto y firma. También podés exportar/importar y eliminar el bot.
+Prefijo, exigir prefijo, distinguir mayúsculas, responder solo si mencionan al bot, acuses de lectura, aviso de comando desconocido, respuesta de respaldo, bienvenida al primer contacto y firma. También podés exportar/importar y eliminar el bot.
 
 ---
 
@@ -184,24 +186,15 @@ Prefijo, exigir prefijo, distinguir mayúsculas, ignorar grupos, acuses de lectu
 
 ---
 
-## Microsoft Teams paso a paso
+## Catálogo, métricas y grupos
 
-Teams no usa QR: se conecta mediante **Azure Bot Service**.
+El panel se organiza como el menú de referencia: **Inicio, Registrar, Mis Bots, Métricas, Catálogo, Términos, Links, Comandos** y, en soporte, **Canal WhatsApp** y **Conexión**.
 
-1. En [Azure Portal](https://portal.azure.com) creá un recurso **Azure Bot** (tipo *Single Tenant* o *Multi Tenant*).
-2. En **Configuración**, poné como *Messaging endpoint* la URL que muestra BotForge:
-   `https://TU-DOMINIO/api/teams/<botId>/messages`
-   (también existe el endpoint global `https://TU-DOMINIO/api/messages`).
-3. En el **App Registration** asociado copiá el **Microsoft App ID** y creá un **Client Secret** (App Password).
-4. En BotForge → pestaña **Teams**, pegá *App ID*, *App Password* y (opcional) *Tenant ID*, y tocá **Activar canal**.
-   - BotForge valida las credenciales pidiendo un token a Azure. Si falla, muestra el motivo.
-5. En Azure → **Canales**, agregá **Microsoft Teams** y publicá la app (podés usar el manifest que BotForge genera y copia desde la pestaña Teams).
-
-**Comandos en Teams:** se aceptan las tres formas: `/menu`, `menu` y `!menu`. El bot responde con las mismas respuestas configuradas; los botones se envían como tarjetas con acciones.
-
-**Sobre reacciones:** la API de Bot Framework no permite agregar reacciones a mensajes. Por eso las reacciones (automáticas, personalizadas y por comando) se aplican **solo en WhatsApp**; en Teams el simulador lo aclara.
-
-**¿Servidor local?** Teams necesita HTTPS público. Podés exponer el puerto 3001 con `cloudflared tunnel --url http://localhost:3001` o `ngrok http 3001` y usar esa URL como messaging endpoint.
+- **Catálogo:** más de 20 comandos y plugins agrupados en moderación, atención, ventas, comunidad, utilidades y dinámica. Elegís el bot destino y tocás *Instalar*: se crea un comando real (editable) y se evita duplicar disparadores.
+- **Métricas:** totales del servidor, tiempo encendido, comandos más usados y detalle por bot. Se refresca cada 20 segundos desde `/api/metrics`.
+- **Comandos:** todo lo que entienden tus bots, agrupado por bot, con alias, tipo de coincidencia y usos.
+- **Canal WhatsApp:** vinculación por QR o pairing code y listado de los grupos reales de la sesión (`/api/bots/:id/groups`).
+- **Conexión:** modo del servidor, acceso, persistencia y salud de `/api/health`.
 
 ---
 
@@ -219,7 +212,7 @@ Se escriben entre llaves dobles y se reemplazan al momento de responder:
 | `{{texto}}` | Texto completo del mensaje |
 | `{{hora}}` / `{{fecha}}` / `{{fecha_larga}}` | Hora y fecha actuales |
 | `{{grupo}}` | Nombre del grupo (si aplica) |
-| `{{canal}}` | WhatsApp o Microsoft Teams |
+| `{{canal}}` | Canal actual (siempre WhatsApp) |
 | `{{lista_comandos}}` | Menú generado con los comandos visibles |
 | `{{texto:slug}}` | Contenido de una plantilla de texto |
 
@@ -261,7 +254,7 @@ npm run build
 AUTH_TOKEN=un-token-largo NODE_ENV=production npm start
 ```
 
-Serví el puerto 3001 detrás de un reverse proxy con HTTPS (Caddy, Nginx, Traefik). Los webhooks de Teams requieren HTTPS y un endpoint público.
+Serví el puerto 3001 detrás de un reverse proxy con HTTPS (Caddy, Nginx, Traefik) para que el panel sea accesible desde el equipo.
 
 ### Docker
 
@@ -300,19 +293,19 @@ Todas las rutas cuelgan de `/api`.
 | POST | `/bots/:id/commands/reorder` | Reordena (`{ order: [ids] }`) |
 | POST/PUT/DELETE | `/bots/:id/texts[/:textId]` | CRUD de plantillas de texto |
 | POST/PUT/DELETE | `/bots/:id/reactions[/:reactionId]` | CRUD de reacciones |
-| POST | `/bots/:id/simulate` | Simula un mensaje (`{ text, channel, name, isGroup }`) |
+| POST | `/bots/:id/simulate` | Simula un mensaje de grupo (`{ text, name }`) y cuenta el uso |
 | GET | `/bots/:id/whatsapp` | Estado de la conexión |
 | POST | `/bots/:id/whatsapp/start` | Inicia vinculación (`{ method: 'qr'\|'pairing', phone }`) |
 | POST | `/bots/:id/whatsapp/stop` | Detiene o cierra sesión (`{ logout }`) |
 | POST | `/bots/:id/whatsapp/test` | Envía un mensaje (`{ jid, text }`) |
-| GET | `/bots/:id/teams` | Estado del canal Teams |
-| PUT | `/bots/:id/teams/credentials` | Guarda App ID / Password / Tenant |
-| POST | `/bots/:id/teams/start` \| `/stop` | Activa o desactiva el canal |
-| POST | `/bots/:id/teams/simulate` | Simula un mensaje de Teams |
-| POST | `/api/teams/:id/messages` | Webhook del Bot Framework |
-| POST | `/api/messages` | Webhook global (detecta el bot por App ID) |
+| GET | `/bots/:id/groups` | Grupos reales de la sesión (`?refresh=1` consulta a WhatsApp) |
+| GET | `/catalog` | Catálogo de comandos y categorías |
+| POST | `/bots/:id/catalog/:pluginId` | Instala un plugin como comando del bot |
+| GET | `/commands` | Comandos de todos los bots (con usos y bot) |
+| GET | `/metrics` | Totales, ranking de comandos y detalle por bot |
+| GET | `/links` | Enlaces oficiales y URL pública |
 
-**Socket.IO:** el cliente entra a la sala con `bot:join` y recibe `whatsapp:status`, `whatsapp:qr`, `whatsapp:pairing`, `whatsapp:connected`, `whatsapp:log`, `whatsapp:message`, `teams:log`, `teams:message` y `stats:update`.
+**Socket.IO:** el cliente entra a la sala con `bot:join` y recibe `whatsapp:status`, `whatsapp:qr`, `whatsapp:pairing`, `whatsapp:connected`, `whatsapp:log`, `whatsapp:message` y `stats:update`.
 
 ---
 
@@ -328,16 +321,17 @@ server/
   defaults.js    Comandos, reacciones y textos por defecto
   templates.js   Plantillas de bots listas para usar
   storage.js     Persistencia en data/db.json
-  whatsapp.js    Motor Baileys: QR, pairing, mensajes, reacciones
-  teams.js       Bot Framework: credenciales, webhook, simulación
+  whatsapp.js    Motor Baileys: QR, pairing, grupos, mensajes, reacciones
+  catalog.js     Catálogo de comandos y plugins instalables
 src/
-  App.jsx        Layout y rutas
-  pages/         Dashboard, espacio de trabajo y pestañas del editor
-  components/    UI (botones, modales, toasts) y previsualización de teléfono
+  App.jsx        Rutas del panel
+  components/    Shell (drawer + barra inferior), UI y previsualización de teléfono
+  pages/         Inicio, Registrar, Mis Bots, Métricas, Catálogo, Términos, Links,
+                 Comandos, Canal WhatsApp, Conexión y espacio de trabajo del bot
   lib/           Cliente API, socket, variables y formato WhatsApp
 api/
   [...route].js  Función serverless de Vercel (API demo o proxy a BACKEND_URL)
-render.yaml      Blueprint de Render (disco persistente + variables)
+render.yaml      Blueprint de Render (plan free + variables)
 vercel.json      Blueprint de Vercel (Vite + función + rewrites)
 DEPLOY.md        Guía de despliegue paso a paso
 test/
@@ -352,17 +346,17 @@ test/
 npm test
 ```
 
-Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y plantillas anidadas, construcción de respuestas (texto, botones, frases al azar, edición, firma), reacciones automáticas y personalizadas, respaldo/comando desconocido, persistencia del almacenamiento y la capa HTTP (health, CORS, creación/simulación de bots, bloqueo de canales en serverless y 404 en JSON).
+Cubren coincidencias de comandos (prefijo, alias, regex, alcance de grupo), variables y plantillas anidadas, construcción de respuestas, reacciones automáticas y personalizadas, persistencia, catálogo e instalación de plugins, métricas, grupos, bloqueo de WhatsApp en serverless y 404 en JSON.
 
 ---
 
 ## Límites, seguridad y buenas prácticas
 
-- **Serverless (Vercel):** el editor y el simulador funcionan, pero WhatsApp/Teams reales requieren un servidor persistente con disco (Render o VPS). En Vercel los datos se guardan en `/tmp` y se reinician.
+- **Serverless (Vercel):** el editor y el simulador funcionan, pero WhatsApp real requiere un servidor persistente con disco (Render o VPS). En Vercel los datos se guardan en `/tmp` y se reinician.
 - **No hay autenticación por defecto** (el blueprint de Render tampoco la activa). Pensado para uso local o detrás de una red privada. En internet, definí `AUTH_TOKEN` y HTTPS.
 - **WhatsApp no oficial:** Baileys usa el protocolo de WhatsApp Web. No está afiliado a Meta. Un uso abusivo (spam, envíos masivos, suplantación) puede provocar la suspensión del número.
 - **Un dispositivo por sesión:** cada bot mantiene su propia sesión. No vincules el mismo número en dos bots al mismo tiempo.
-- **Reacciones en Teams:** no soportadas por la API.
+- **Solo grupos:** los mensajes privados se descartan; no hay modo de atención 1 a 1.
 - **Límites del editor:** 60 comandos, 40 reacciones, 40 plantillas, 10 alias y 10 botones por comando.
 - **Mensajes de voz, archivos y catálogos:** el bot responde a texto (incluye pies de foto y respuestas de botones). No procesa audios ni adjuntos.
 - **Respaldo:** `data/` contiene las credenciales de WhatsApp y la base. Guardalo en un volumen seguro y no lo subas a Git (ya está en `.gitignore`).
@@ -377,10 +371,9 @@ Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y 
 | «Conexión cerrada (401)» | La sesión se cerró desde el teléfono. Tocá *Limpiar sesión* y vinculá de nuevo. |
 | «Conexión cerrada (515)» | WhatsApp pidió reiniciar; BotForge reconecta automáticamente. |
 | Escaneé el QR y no pasa nada | Esperá unos segundos; el QR se renueva. Si expiró, generá uno nuevo. |
-| No responde en grupos | «Ignorar grupos» está activo en Ajustes, o el comando tiene alcance «solo privados». |
+| No responde en el grupo | La sesión no está vinculada, el comando está pausado o activaste «Responder solo si mencionan al bot». |
 | No responde a comandos sin prefijo | Activá «Exigir prefijo» en Ajustes si querés ambos modos, o quitá el prefijo a los comandos (`prefixRequired`). |
-| Teams dice «No se pudieron validar las credenciales» | Revisá App ID/Password, que el App Registration exista y que el servidor tenga salida a `login.microsoftonline.com`. |
-| Teams no recibe mensajes | El messaging endpoint debe ser HTTPS público y terminar en `/api/teams/<botId>/messages`. |
+| La lista de grupos está vacía | La sesión debe estar conectada; tocá *Actualizar* en la pestaña **Grupos** o en **Canal WhatsApp**. |
 | La previsualización del teléfono no responde | Usá **Probar** o el simulador; el teléfono del editor no envía mensajes reales. |
 
 ---
@@ -391,6 +384,6 @@ Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y 
 - Respuestas con listas interactivas y catálogos.
 - Programación de mensajes y recordatorios.
 - Webhooks salientes hacia otras apps (CRM, Sheets, n8n).
-- Panel de métricas históricas por comando.
+- Histórico de métricas por comando (hoy se reinicia con el servidor).
 
 Hecho con ❤️ usando **React + Vite**, **Express**, **Socket.IO**, **Baileys** y **Bot Framework SDK v4**.

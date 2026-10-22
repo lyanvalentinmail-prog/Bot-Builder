@@ -85,7 +85,7 @@ test('flujo de bot: crear, simular y exportar', async () => {
   assert.ok(payload.bot.commands.length > 0);
 });
 
-test('WhatsApp y Teams reales se bloquean con un mensaje claro', async () => {
+test('WhatsApp real se bloquea en serverless con un mensaje claro', async () => {
   const bots = await (await get('/api/bots')).json();
   const botId = bots.bots[0].id;
 
@@ -97,10 +97,56 @@ test('WhatsApp y Teams reales se bloquean con un mensaje claro', async () => {
   assert.equal(wa.status, 501);
   const waData = await wa.json();
   assert.equal(waData.code, 'SERVERLESS_WHATSAPP_UNSUPPORTED');
+});
 
-  const teams = await get(`/api/bots/${botId}/teams/start`, { method: 'POST' });
-  assert.equal(teams.status, 501);
-  assert.equal((await teams.json()).code, 'SERVERLESS_TEAMS_UNSUPPORTED');
+test('el catálogo expone comandos e instalarlos crea el comando real', async () => {
+  const catalog = await (await get('/api/catalog')).json();
+  assert.ok(catalog.plugins.length >= 10);
+  assert.ok(catalog.categories.some((c) => c.id === 'moderacion'));
+
+  const created = await (
+    await get('/api/bots', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template: 'starter', name: 'Catálogo Test' }),
+    })
+  ).json();
+  const botId = created.bot.id;
+
+  const install = await get(`/api/bots/${botId}/catalog/reglas`, { method: 'POST' });
+  assert.equal(install.status, 201);
+  const installed = await install.json();
+  assert.equal(installed.command.trigger, 'reglas');
+
+  const repeated = await get(`/api/bots/${botId}/catalog/reglas`, { method: 'POST' });
+  assert.equal(repeated.status, 409);
+
+  const simulated = await (
+    await get(`/api/bots/${botId}/simulate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: '!reglas' }),
+    })
+  ).json();
+  assert.equal(simulated.matched, true);
+  assert.match(simulated.actions[0].text, /Reglas del grupo/);
+});
+
+test('las métricas y los grupos salen de datos reales del servidor', async () => {
+  const metrics = await (await get('/api/metrics')).json();
+  assert.ok(metrics.totals.bots >= 2);
+  assert.ok(metrics.totals.commands > 0);
+  assert.equal(typeof metrics.uptimeSeconds, 'number');
+  assert.ok(Array.isArray(metrics.perBot));
+  assert.equal(metrics.perBot.length, metrics.totals.bots);
+
+  const bots = await (await get('/api/bots')).json();
+  const groups = await (await get(`/api/bots/${bots.bots[0].id}/groups`)).json();
+  assert.equal(groups.connected, false);
+  assert.deepEqual(groups.groups, []);
+
+  const links = await (await get('/api/links')).json();
+  assert.ok(links.links.some((l) => l.id === 'repo'));
 });
 
 test('las rutas desconocidas responden JSON 404', async () => {

@@ -5,7 +5,6 @@ import express from 'express';
 import { Server as SocketServer } from 'socket.io';
 import { api } from './api.js';
 import { whatsapp } from './whatsapp.js';
-import { teams } from './teams.js';
 import { store } from './storage.js';
 import { AUTH_TOKEN, CORS_ORIGINS, IS_PROD, WEB_DIST } from './config.js';
 
@@ -68,12 +67,8 @@ export function createApp({ serveStatic = true } = {}) {
 
   if (AUTH_TOKEN) {
     app.use((req, res, next) => {
-      // Webhooks de Teams: se validan con el JWT del Bot Framework.
-      if (
-        req.path.startsWith('/api/teams') ||
-        req.path === '/api/messages' ||
-        req.path === '/api/health'
-      ) {
+      // La salud del servicio queda abierta para el health check del hosting.
+      if (req.path === '/api/health') {
         return next();
       }
       const bearer = req.get('authorization')?.replace(/^Bearer\s+/i, '');
@@ -109,25 +104,6 @@ export function createApp({ serveStatic = true } = {}) {
 
   app.use('/api', api);
 
-  /* ---------------------- webhooks de Microsoft Teams ---------------------- */
-
-  app.post('/api/teams/:id/messages', (req, res, next) => {
-    teams.webhookHandler(req.params.id)(req, res).catch(next);
-  });
-
-  app.post('/api/messages', async (req, res, next) => {
-    try {
-      const bot = teams.findByRecipient(req.body?.recipient?.id || '');
-      if (!bot) {
-        res.status(404).json({ error: 'No hay un bot configurado para este App ID' });
-        return;
-      }
-      await teams.webhookHandler(bot.id)(req, res);
-    } catch (error) {
-      next(error);
-    }
-  });
-
   // Cualquier ruta /api desconocida responde JSON (antes del handler estático).
   app.use('/api', (req, res) => {
     res.status(404).json({ error: `Ruta no encontrada: ${req.method} /api${req.path}` });
@@ -160,7 +136,7 @@ export function createApp({ serveStatic = true } = {}) {
   return app;
 }
 
-/** Socket.IO: estado en vivo de WhatsApp y Teams. Solo en servidores persistentes. */
+/** Socket.IO: estado en vivo de WhatsApp. Solo en servidores persistentes. */
 export function attachRealtime(server) {
   const io = new SocketServer(server, {
     cors: {
@@ -182,7 +158,6 @@ export function attachRealtime(server) {
   }
 
   whatsapp.attachIo(io);
-  teams.attachIo(io);
 
   io.on('connection', (socket) => {
     socket.on('bot:join', (payload = {}) => {
@@ -202,7 +177,6 @@ export function attachRealtime(server) {
       if (status.pairingCode) {
         socket.emit('whatsapp:pairing', { botId, code: status.pairingCode });
       }
-      socket.emit('teams:status', { botId, ...teams.status(botId) });
       socket.emit('ready', { botId, at: new Date().toISOString() });
     });
   });

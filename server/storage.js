@@ -31,11 +31,11 @@ function normalizeReactions(reactions, fallback) {
     name: String(r.name || 'Reacción').slice(0, 60),
     enabled: r.enabled !== false,
     emoji: String(r.emoji || '👍').slice(0, 12),
-    on: ['every', 'keyword', 'command', 'regex', 'dm', 'group', 'mention'].includes(r.on)
+    on: ['every', 'keyword', 'command', 'regex', 'group', 'mention'].includes(r.on)
       ? r.on
       : 'keyword',
     pattern: String(r.pattern || '').slice(0, 300),
-    scope: ['all', 'dm', 'group'].includes(r.scope) ? r.scope : 'all',
+    scope: ['all', 'group'].includes(r.scope) ? r.scope : 'all',
     chance: Math.max(0, Math.min(100, Number(r.chance) || 100)),
     removeAfterSeconds: Math.max(0, Math.min(3600, Number(r.removeAfterSeconds) || 0)),
   }));
@@ -65,21 +65,12 @@ function normalizeBot(raw) {
         lastError: null,
         ...(raw.channels?.whatsapp || {}),
       },
-      teams: {
-        enabled: false,
-        appId: '',
-        appPassword: '',
-        tenantId: '',
-        status: 'not_configured',
-        lastError: null,
-        conversations: [],
-        ...(raw.channels?.teams || {}),
-      },
     },
     stats: {
       messages: Number(raw.stats?.messages) || 0,
       replies: Number(raw.stats?.replies) || 0,
       reactions: Number(raw.stats?.reactions) || 0,
+      lastActiveAt: raw.stats?.lastActiveAt || null,
     },
   };
   // Un bot nunca está "conectado" hasta que el socket levanta.
@@ -150,15 +141,8 @@ export class Store {
       updatedAt: new Date().toISOString(),
       channels: {
         whatsapp: { enabled: false, status: 'disconnected', me: null, connectedAt: null },
-        teams: {
-          ...source.channels.teams,
-          appPassword: '',
-          enabled: false,
-          status: 'not_configured',
-          conversations: [],
-        },
       },
-      stats: { messages: 0, replies: 0, reactions: 0 },
+      stats: { messages: 0, replies: 0, reactions: 0, lastActiveAt: null },
     });
     copy.commands = copy.commands.map((c) => ({ ...c, id: uid('cmd_'), usageCount: 0 }));
     copy.texts = copy.texts.map((t) => ({ ...t, id: uid('txt_') }));

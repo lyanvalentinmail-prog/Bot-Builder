@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "BotForge — creador de bots para WhatsApp y Microsoft Teams",
+  "description": "BotForge — creador de bots para grupos de WhatsApp",
   "engines": {
     "node": ">=20"
   },
@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "@whiskeysockets/baileys": "6.7.24",
-    "@azure/msal-node": "^2.16.2",
-    "botbuilder": "^4.23.3",
     "express": "^4.21.2",
     "pino": "^9.6.0",
     "qrcode": "^1.5.4",

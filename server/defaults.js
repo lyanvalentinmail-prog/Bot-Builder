@@ -2,13 +2,13 @@ import { uid } from './util.js';
 
 export const MATCH_TYPES = ['command', 'exact', 'contains', 'startsWith', 'regex', 'any'];
 export const REPLY_TYPES = ['text', 'random', 'image', 'buttons', 'none'];
-export const SCOPES = ['all', 'dm', 'group'];
+export const SCOPES = ['all', 'group'];
 
 export const defaultSettings = () => ({
   prefix: '!',
   prefixRequired: true,
   caseSensitive: false,
-  ignoreGroups: true,
+  requireMention: false,
   readReceipts: true,
   unknownCommandEnabled: true,
   unknownCommandText:
@@ -231,7 +231,7 @@ export const newBot = (data = {}) => {
     description:
       typeof data.description === 'string'
         ? data.description.slice(0, 240)
-        : 'Asistente automático para WhatsApp y Microsoft Teams.',
+        : 'Asistente automático para grupos de WhatsApp.',
     template: data.template || 'custom',
     createdAt: stamp,
     updatedAt: stamp,
@@ -249,26 +249,17 @@ export const newBot = (data = {}) => {
         connectedAt: null,
         lastError: null,
       },
-      teams: {
-        enabled: false,
-        appId: '',
-        appPassword: '',
-        tenantId: '',
-        status: 'not_configured',
-        lastError: null,
-        conversations: [],
-      },
     },
-    stats: { messages: 0, replies: 0, reactions: 0 },
+    stats: { messages: 0, replies: 0, reactions: 0, lastActiveAt: null },
   };
 };
 
 export const seedBot = () => {
   const bot = newBot({
-    name: 'Asistente de bienvenida',
+    name: 'Asistente del grupo',
     emoji: '💬',
     description:
-      'Bot de ejemplo con comandos, reacciones y plantillas listas para personalizar.',
+      'Bot de ejemplo para grupos: comandos, reacciones y plantillas listas para personalizar.',
     template: 'starter',
   });
   return bot;

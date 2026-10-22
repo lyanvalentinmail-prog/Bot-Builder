@@ -5,7 +5,6 @@ import { escapeRegExp, randomOf } from './util.js';
 export function matchesCommand(command, rawText, settings = {}, ctx = {}) {
   if (!command || command.enabled === false) return false;
   if (command.scope === 'group' && !ctx.isGroup) return false;
-  if (command.scope === 'dm' && ctx.isGroup) return false;
 
   const prefix = settings.prefix || '!';
   const prefixRequired = settings.prefixRequired !== false;
@@ -105,7 +104,6 @@ const hasKeyword = (pattern, text) => {
 export function chooseAutoReaction(bot, message = {}, isGroup = false) {
   const config = bot.autoReact || {};
   if (!config.enabled) return null;
-  if (config.scope === 'dm' && isGroup) return null;
   if (config.scope === 'group' && !isGroup) return null;
 
   const text = message.text || '';
@@ -132,7 +130,6 @@ export function chooseCustomReaction(bot, message = {}, ctx = {}) {
   const isCommand = text.startsWith(prefix);
   for (const reaction of bot.reactions || []) {
     if (reaction.enabled === false || !reaction.emoji) continue;
-    if (reaction.scope === 'dm' && ctx.isGroup) continue;
     if (reaction.scope === 'group' && !ctx.isGroup) continue;
     const chance = Math.max(0, Math.min(100, Number(reaction.chance ?? 100)));
     if (chance <= 0 || Math.random() * 100 > chance) continue;
@@ -154,9 +151,6 @@ export function chooseCustomReaction(bot, message = {}, ctx = {}) {
         } catch {
           hit = false;
         }
-        break;
-      case 'dm':
-        hit = !ctx.isGroup;
         break;
       case 'group':
         hit = Boolean(ctx.isGroup);

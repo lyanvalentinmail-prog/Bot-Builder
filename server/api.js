@@ -1,8 +1,8 @@
 import express from 'express';
 import { store } from './storage.js';
 import { whatsapp } from './whatsapp.js';
-import { teams } from './teams.js';
 import { TEMPLATES, getTemplate } from './templates.js';
+import { CATALOG, CATALOG_BY_ID, CATALOG_CATEGORIES, publicCatalog } from './catalog.js';
 import { processMessage, extractCommandName, findCommand } from './engine.js';
 import {
   buildVariables,
@@ -49,10 +49,7 @@ const botSummary = (bot) => ({
     status: whatsapp.status(bot.id).status,
     connected: whatsapp.status(bot.id).status === 'connected',
     phone: bot.channels.whatsapp.phone,
-  },
-  teams: {
-    status: bot.channels.teams.enabled ? bot.channels.teams.status : 'not_configured',
-    configured: Boolean(bot.channels.teams.appId && bot.channels.teams.appPassword),
+    lastError: bot.channels.whatsapp.lastError || null,
   },
 });
 
@@ -62,12 +59,6 @@ const publicBot = (bot) => ({
     whatsapp: {
       ...bot.channels.whatsapp,
       ...whatsapp.status(bot.id),
-    },
-    teams: {
-      ...bot.channels.teams,
-      appPassword: bot.channels.teams.appPassword ? '********' : '',
-      status: bot.channels.teams.enabled ? bot.channels.teams.status : 'not_configured',
-      endpoint: `/api/teams/${bot.id}/messages`,
     },
   },
 });
@@ -86,7 +77,7 @@ function cleanSettings(input = {}, previous = defaultSettings()) {
   for (const key of [
     'prefixRequired',
     'caseSensitive',
-    'ignoreGroups',
+    'requireMention',
     'readReceipts',
     'unknownCommandEnabled',
     'fallbackEnabled',
@@ -177,7 +168,8 @@ api.get('/meta', (req, res) => {
     scopes: SCOPES,
     limits: { commands: 60, reactions: 40, texts: 40, aliases: 10 },
     whatsappEngine: 'Baileys (WhatsApp Web multi-dispositivo)',
-    teamsEngine: 'Bot Framework SDK v4',
+    scope: 'groups',
+    catalog: { categories: CATALOG_CATEGORIES, total: CATALOG.length },
     deploy: deployInfo({
       serverless: IS_SERVERLESS,
       ephemeralData: EPHEMERAL_DATA,
@@ -229,7 +221,6 @@ api.put('/bots/:id', requireBot, (req, res) => {
 
 api.delete('/bots/:id', requireBot, async (req, res) => {
   await whatsapp.stop(req.bot.id, { logout: true });
-  await teams.stop(req.bot.id);
   store.deleteBot(req.bot.id);
   res.json({ ok: true });
 });
@@ -380,25 +371,19 @@ api.delete('/bots/:id/reactions/:reactionId', requireBot, (req, res) => {
 
 /* ---------------------------- simular ---------------------------- */
 
-function channelLabel(channel) {
-  return channel === 'teams' ? 'Microsoft Teams' : 'WhatsApp';
-}
-
 api.post('/bots/:id/simulate', requireBot, async (req, res) => {
-  const channel = req.body?.channel === 'teams' ? 'teams' : 'whatsapp';
+  const channel = 'whatsapp';
   const rawText = asString(req.body?.text, 2000).trim();
   if (!rawText) return res.status(400).json({ error: 'Escribí un mensaje para probar' });
 
   const name = asString(req.body?.name, 60).trim() || 'Ana';
-  const isGroup = Boolean(req.body?.isGroup);
-  let text = rawText;
-  if (channel === 'teams') text = teams.normalizeIncomingText(req.bot, rawText);
-
+  const isGroup = true;
+  const text = rawText;
   const date = new Date();
-  const groupName = isGroup ? asString(req.body?.groupName, 60) || 'Equipo Ventas' : '';
+  const groupName = asString(req.body?.groupName, 60) || 'Grupo Ventas';
   const ctx = {
     isGroup,
-    channel: channelLabel(channel),
+    channel: 'WhatsApp',
     groupName,
     name,
     number: isGroup ? '+598 99 123 456' : '+598 99 123 456',
@@ -431,6 +416,15 @@ api.post('/bots/:id/simulate', requireBot, async (req, res) => {
     };
   });
 
+  // El simulador también cuenta como uso real del comando para las métricas.
+  if (result.matched && result.command) {
+    const target = req.bot.commands.find((command) => command.id === result.command.id);
+    if (target) {
+      target.usageCount = (target.usageCount || 0) + 1;
+      store.saveBot(req.bot);
+    }
+  }
+
   res.json({
     channel,
     input: { text: rawText, normalized: text, name, isGroup },
@@ -446,10 +440,6 @@ api.post('/bots/:id/simulate', requireBot, async (req, res) => {
     enteredCommand: extractCommandName(text, req.bot.settings),
     reactions,
     actions: normalizedActions,
-    teamsNote:
-      channel === 'teams'
-        ? 'En Teams las reacciones nativas no se pueden enviar por API: se muestran solo en WhatsApp.'
-        : null,
   });
 });
 
@@ -511,74 +501,179 @@ api.post('/bots/:id/whatsapp/test', requireBot, async (req, res) => {
   }
 });
 
-/* ----------------------------- teams ---------------------------- */
+/* --------------------------- grupos de WhatsApp ------------------ */
 
-api.get('/bots/:id/teams', requireBot, (req, res) => {
-  res.json({ teams: teams.status(req.bot.id) });
+api.get('/bots/:id/groups', requireBot, async (req, res) => {
+  const refresh = req.query.refresh === '1' || req.query.refresh === 'true';
+  try {
+    const data = await whatsapp.groups(req.bot.id, { refresh });
+    res.json({ ...data, botId: req.bot.id });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-api.put('/bots/:id/teams/credentials', requireBot, async (req, res) => {
-  const { appId, appPassword, tenantId } = req.body || {};
-  const t = req.bot.channels.teams;
-  if (typeof appId === 'string') t.appId = appId.trim().slice(0, 120);
-  if (typeof appPassword === 'string' && appPassword && appPassword !== '********') {
-    t.appPassword = appPassword.trim().slice(0, 200);
-  }
-  if (typeof tenantId === 'string') t.tenantId = tenantId.trim().slice(0, 120);
-  if (appId === '' || appPassword === '') {
-    t.enabled = false;
-    t.status = 'not_configured';
-  }
-  store.saveBot(req.bot);
-  teams.adapters.delete(req.bot.id);
-  res.json({ teams: teams.status(req.bot.id) });
+/* ------------------------- catálogo de comandos ------------------ */
+
+api.get('/catalog', (req, res) => {
+  res.json({ categories: CATALOG_CATEGORIES, plugins: publicCatalog() });
 });
 
-api.post('/bots/:id/teams/start', requireBot, async (req, res) => {
-  if (IS_SERVERLESS) {
-    return res.status(501).json({
-      error:
-        'El canal de Teams necesita un servidor persistente para mantener las credenciales y validar sesiones. En serverless podés guardar las credenciales y usar el simulador, pero no activar el canal.',
-      code: 'SERVERLESS_TEAMS_UNSUPPORTED',
+api.post('/bots/:id/catalog/:pluginId', requireBot, (req, res) => {
+  const plugin = CATALOG_BY_ID.get(req.params.pluginId);
+  if (!plugin) return res.status(404).json({ error: 'Ese comando no está en el catálogo' });
+  if (req.bot.commands.length >= 60) {
+    return res.status(400).json({ error: 'Máximo 60 comandos por bot' });
+  }
+  const existing = req.bot.commands.find(
+    (c) =>
+      c.trigger.toLowerCase() === plugin.command.trigger.toLowerCase() ||
+      (plugin.command.aliases || []).some((alias) =>
+        [c.trigger, ...c.aliases].some((value) => value.toLowerCase() === alias.toLowerCase()),
+      ),
+  );
+  if (existing) {
+    return res.status(409).json({
+      error: `El bot ya tiene un comando con ese disparador («${existing.trigger}»). Cambialo antes de instalar «${plugin.name}».`,
+      command: existing,
     });
   }
-  try {
-    const status = await teams.start(req.bot.id);
-    res.json({ ok: true, teams: status });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
+  const command = makeCommand({ ...plugin.command, id: undefined, usageCount: 0 });
+  req.bot.commands.push(command);
+  store.saveBot(req.bot);
+  return res.status(201).json({ pluginId: plugin.id, command, bot: publicBot(req.bot) });
 });
 
-api.post('/bots/:id/teams/stop', requireBot, async (req, res) => {
-  const status = await teams.stop(req.bot.id);
-  res.json({ ok: true, teams: status });
-});
+/* --------------------------- comandos globales ------------------- */
 
-api.post('/bots/:id/teams/simulate', requireBot, async (req, res) => {
-  const text = asString(req.body?.text, 2000).trim();
-  if (!text) return res.status(400).json({ error: 'Escribí un mensaje' });
-  const result = await teams.simulate(req.bot.id, {
-    text,
-    name: asString(req.body?.name, 60) || 'Ana (simulación)',
-  });
-  const normalizedActions = result.actions.map((a) =>
-    a.kind === 'buttons'
-      ? {
-          ...a,
-          text: [a.text, ...(a.buttons || []).map((b, i) => `${i + 1}️⃣ ${b.label}`)].join('\n\n'),
-        }
-      : a,
+api.get('/commands', (req, res) => {
+  const bots = store.listBots();
+  const commands = bots.flatMap((bot) =>
+    bot.commands.map((command) => ({
+      id: command.id,
+      name: command.name,
+      description: command.description,
+      trigger: command.trigger,
+      aliases: command.aliases,
+      matchType: command.matchType,
+      enabled: command.enabled !== false,
+      showInMenu: command.showInMenu !== false,
+      usageCount: command.usageCount || 0,
+      replyType: command.reply?.type || 'text',
+      bot: { id: bot.id, name: bot.name, emoji: bot.emoji, prefix: bot.settings?.prefix || '!' },
+    })),
   );
+  const total = commands.length;
+  const active = commands.filter((command) => command.enabled).length;
+  res.json({ total, active, commands });
+});
+
+/* ----------------------------- métricas -------------------------- */
+
+api.get('/metrics', (req, res) => {
+  const bots = store.listBots();
+  const perBot = bots.map((bot) => {
+    const status = whatsapp.status(bot.id);
+    const commands = bot.commands.filter((c) => c.enabled !== false);
+    const top = [...commands].sort((a, b) => (b.usageCount || 0) - (a.usageCount || 0))[0];
+    return {
+      id: bot.id,
+      name: bot.name,
+      emoji: bot.emoji,
+      createdAt: bot.createdAt,
+      updatedAt: bot.updatedAt,
+      status: status.status,
+      connected: status.status === 'connected',
+      phone: bot.channels.whatsapp.phone || '',
+      commands: commands.length,
+      reactions: bot.reactions.filter((r) => r.enabled !== false).length,
+      texts: bot.texts.length,
+      messages: bot.stats?.messages || 0,
+      replies: bot.stats?.replies || 0,
+      reactionsSent: bot.stats?.reactions || 0,
+      lastActiveAt: bot.stats?.lastActiveAt || null,
+      topCommand: top ? { name: top.name, trigger: top.trigger, usageCount: top.usageCount || 0 } : null,
+    };
+  });
+
+  const totals = perBot.reduce(
+    (acc, bot) => ({
+      bots: acc.bots + 1,
+      connected: acc.connected + (bot.connected ? 1 : 0),
+      commands: acc.commands + bot.commands,
+      reactions: acc.reactions + bot.reactions,
+      texts: acc.texts + bot.texts,
+      messages: acc.messages + bot.messages,
+      replies: acc.replies + bot.replies,
+      reactionsSent: acc.reactionsSent + bot.reactionsSent,
+    }),
+    { bots: 0, connected: 0, commands: 0, reactions: 0, texts: 0, messages: 0, replies: 0, reactionsSent: 0 },
+  );
+
+  const topCommands = bots
+    .flatMap((bot) =>
+      bot.commands.map((command) => ({
+        name: command.name,
+        trigger: command.trigger,
+        usageCount: command.usageCount || 0,
+        botId: bot.id,
+        botName: bot.name,
+        emoji: bot.emoji,
+      })),
+    )
+    .filter((command) => command.usageCount > 0)
+    .sort((a, b) => b.usageCount - a.usageCount)
+    .slice(0, 8);
+
   res.json({
-    channel: 'teams',
-    input: { text, normalized: result.normalizedText },
-    matched: result.matched,
-    command: result.command
-      ? { id: result.command.id, name: result.command.name, trigger: result.command.trigger }
-      : null,
-    reactions: result.reactions,
-    actions: normalizedActions,
+    generatedAt: new Date().toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    totals,
+    topCommands,
+    perBot,
+    activity: perBot
+      .filter((bot) => bot.lastActiveAt)
+      .sort((a, b) => new Date(b.lastActiveAt) - new Date(a.lastActiveAt))
+      .slice(0, 6),
+  });
+});
+
+/* ------------------------------ enlaces -------------------------- */
+
+api.get('/links', (req, res) => {
+  const repo = 'https://github.com/lyanvalentinmail-prog/Bot-Builder';
+  res.json({
+    publicUrl: PUBLIC_URL || '',
+    links: [
+      {
+        id: 'repo',
+        name: 'Repositorio del proyecto',
+        description: 'Código, issues y notas de versión.',
+        url: repo,
+        icon: 'github',
+      },
+      {
+        id: 'deploy',
+        name: 'Guía de despliegue',
+        description: 'Render, Vercel y servidor propio, paso a paso.',
+        url: `${repo}/blob/main/DEPLOY.md`,
+        icon: 'monitor',
+      },
+      {
+        id: 'readme',
+        name: 'Documentación',
+        description: 'Comandos, variables y API completa.',
+        url: `${repo}/blob/main/README.md`,
+        icon: 'text',
+      },
+      {
+        id: 'health',
+        name: 'Salud del servidor',
+        description: 'Estado en vivo de la API de este panel.',
+        url: PUBLIC_URL ? `${PUBLIC_URL}/api/health` : '/api/health',
+        icon: 'sparkles',
+      },
+    ],
   });
 });
 

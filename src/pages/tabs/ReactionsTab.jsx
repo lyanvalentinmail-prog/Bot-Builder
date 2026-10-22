@@ -19,7 +19,6 @@ const CONDITION_LABELS = {
   command: 'Cuando se usa un comando',
   every: 'En todos los mensajes',
   regex: 'Coincide con una expresión regular',
-  dm: 'Mensajes privados',
   group: 'Mensajes de grupo',
   mention: 'Cuando mencionan al bot',
 };
@@ -29,7 +28,6 @@ const CONDITION_HELP = {
   command: 'Escribí los comandos sin el prefijo, separados por coma. Ej: menu, ping',
   every: 'Reacciona a cada mensaje recibido. Usalo con probabilidad baja.',
   regex: 'Ejemplo: ^(hola|buenas)\\b',
-  dm: 'Reacciona solo en chats privados.',
   group: 'Reacciona solo en grupos.',
   mention: 'Reacciona cuando el mensaje menciona al bot.',
 };
@@ -175,8 +173,7 @@ export default function ReactionsTab({ bot, setBot, notify, patchBot }) {
                   disabled={!auto.enabled}
                   onChange={(e) => saveAuto({ scope: e.target.value })}
                 >
-                  <option value="all">Todos los chats</option>
-                  <option value="dm">Solo privados</option>
+                  <option value="all">Todos los mensajes del grupo</option>
                   <option value="group">Solo grupos</option>
                 </Select>
               </Field>
@@ -235,13 +232,13 @@ export default function ReactionsTab({ bot, setBot, notify, patchBot }) {
                     <strong>{reaction.name}</strong>
                     <span className="muted small">
                       {CONDITION_LABELS[reaction.on]}
-                      {reaction.on !== 'every' && reaction.on !== 'dm' && reaction.on !== 'group'
+                      {reaction.on !== 'every' && reaction.on !== 'group'
                         ? `: ${reaction.pattern || '(sin texto)'}`
                         : ''}
                     </span>
                     <span className="reaction-badges">
                       <span className="chip chip-xs">
-                        {reaction.scope === 'all' ? 'Todos' : reaction.scope === 'dm' ? 'Privados' : 'Grupos'}
+                        {reaction.scope === 'all' ? 'Todos' : 'Grupos'}
                       </span>
                       <span className="chip chip-xs">{reaction.chance}%</span>
                       {reaction.removeAfterSeconds ? (
@@ -295,7 +292,7 @@ export default function ReactionsTab({ bot, setBot, notify, patchBot }) {
           <ul className="tips">
             <li>Una reacción por mensaje: WhatsApp reemplaza la anterior.</li>
             <li>Evitá el 100% en grupos grandes para no parecer un bot invasivo.</li>
-            <li>En Microsoft Teams la API no permite reaccionar: las reacciones son solo de WhatsApp.</li>
+            <li>El bot solo reacciona a mensajes de grupos: los chats privados se ignoran.</li>
           </ul>
         </Card>
       </div>
@@ -382,8 +379,7 @@ export default function ReactionsTab({ bot, setBot, notify, patchBot }) {
                   value={editing.scope}
                   onChange={(e) => setEditing({ ...editing, scope: e.target.value })}
                 >
-                  <option value="all">Todos los chats</option>
-                  <option value="dm">Solo privados</option>
+                  <option value="all">Todos los mensajes del grupo</option>
                   <option value="group">Solo grupos</option>
                 </Select>
               </Field>
