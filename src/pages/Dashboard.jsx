@@ -138,11 +138,14 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {meta?.deploy?.serverless ? (
+      {meta?.deploy?.ephemeral ? (
         <div className="hint-box hint-warn deploy-banner">
           <Icon name="warning" size={16} />
           <span>
-            <strong>Estás en Vercel (serverless).</strong> {meta.deploy.hint}
+            <strong>
+              {meta.deploy.serverless ? 'Modo serverless (Vercel).' : 'Plan sin disco persistente.'}
+            </strong>{' '}
+            {meta.deploy.hint}
           </span>
         </div>
       ) : null}

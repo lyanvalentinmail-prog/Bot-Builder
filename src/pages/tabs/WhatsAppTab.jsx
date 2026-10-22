@@ -21,7 +21,7 @@ const STATUS_TEXT = {
   error: 'Error de conexión',
 };
 
-export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, onLog, reload }) {
+export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, onLog, reload, deploy }) {
   const [method, setMethod] = useState('qr');
   const [phone, setPhone] = useState(bot.channels.whatsapp.phone || '');
   const [starting, setStarting] = useState(false);
@@ -33,6 +33,8 @@ export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, 
 
   const status = live.status || 'disconnected';
   const busy = ['connecting', 'qr', 'pairing'].includes(status);
+  const serverless = Boolean(deploy?.serverless);
+  const ephemeral = Boolean(deploy?.ephemeral);
 
   // Sondeo de respaldo: mantiene QR y estado al día incluso si Socket.IO no está
   // disponible (por ejemplo, frontend en Vercel con proxy hacia Render).
@@ -138,6 +140,17 @@ export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, 
             </div>
             <StatusDot status={status === 'connected' ? 'connected' : status} label={STATUS_TEXT[status]} />
           </div>
+
+          {ephemeral ? (
+            <div className="hint-box hint-warn">
+              <Icon name="warning" size={15} />
+              <span>
+                {serverless
+                  ? 'En serverless (Vercel) no se puede vincular WhatsApp: necesita un proceso persistente con WebSocket y disco. Desplegá en Render o configurá BACKEND_URL hacia Render (ver DEPLOY.md).'
+                  : 'Este plan no tiene disco persistente: la sesión de WhatsApp se pierde si el servicio se reinicia, se duerme o se redeploya, y habrá que escanear el QR otra vez. Para un bot 24/7 pasá al plan con disco (ver DEPLOY.md).'}
+              </span>
+            </div>
+          ) : null}
 
           {status === 'connected' ? (
             <div className="connected-panel">
@@ -265,7 +278,12 @@ export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, 
                     icon={method === 'qr' ? 'qr' : 'key'}
                     onClick={start}
                     loading={starting}
-                    disabled={busy}
+                    disabled={busy || serverless}
+                    title={
+                      serverless
+                        ? 'La vinculación real de WhatsApp requiere un servidor persistente (Render, Railway o un VPS)'
+                        : undefined
+                    }
                   >
                     {status === 'qr'
                       ? 'Generar un QR nuevo'

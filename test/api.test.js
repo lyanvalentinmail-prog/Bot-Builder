@@ -37,7 +37,10 @@ test('GET /api/meta indica el modo serverless y los canales', async () => {
   assert.equal(res.status, 200);
   const data = await res.json();
   assert.equal(data.deploy.serverless, true);
+  assert.equal(data.deploy.ephemeral, true);
   assert.equal(data.deploy.persistentChannels, false);
+  assert.equal(data.deploy.persistentData, false);
+  assert.equal(data.deploy.mode, 'serverless');
   assert.ok(Array.isArray(data.templates));
   assert.ok(data.deploy.hint.includes('Render'));
 });

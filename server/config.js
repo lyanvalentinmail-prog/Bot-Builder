@@ -33,11 +33,25 @@ export const IS_PROD = NODE_ENV === 'production';
 
 export const AUTH_TOKEN = process.env.AUTH_TOKEN || '';
 
+/**
+ * Render Free (y otros planes sin disco) mantiene un filesystem escribible pero
+ * efímero: el blueprint marca EPHEMERAL_DATA=true para avisarlo en la interfaz.
+ */
+export const EPHEMERAL_DATA = ['1', 'true', 'yes', 'on'].includes(
+  String(process.env.EPHEMERAL_DATA || '').toLowerCase(),
+);
+
 /** Orígenes permitidos para CORS: "*" o lista separada por comas. */
 export const CORS_ORIGINS = (process.env.CORS_ORIGINS || '*')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-/** Base pública usada en enlaces/documentación. */
-export const PUBLIC_URL = (process.env.PUBLIC_URL || '').replace(/\/+$/, '');
+/** Base pública usada en enlaces/documentación (Render y Vercel la exponen). */
+const hostFromPlatform = process.env.RENDER_EXTERNAL_URL
+  ? process.env.RENDER_EXTERNAL_URL
+  : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : '';
+
+export const PUBLIC_URL = (process.env.PUBLIC_URL || hostFromPlatform).replace(/\/+$/, '');

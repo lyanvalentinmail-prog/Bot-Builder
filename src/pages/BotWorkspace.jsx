@@ -209,11 +209,14 @@ export default function BotWorkspace() {
         </div>
       </header>
 
-      {meta?.deploy?.serverless ? (
+      {meta?.deploy?.ephemeral ? (
         <div className="hint-box hint-warn deploy-banner">
           <Icon name="warning" size={16} />
           <span>
-            <strong>Modo serverless (Vercel).</strong> {meta.deploy.hint}
+            <strong>
+              {meta.deploy.serverless ? 'Modo serverless (Vercel).' : 'Plan sin disco persistente.'}
+            </strong>{' '}
+            {meta.deploy.hint}
           </span>
         </div>
       ) : null}
@@ -238,6 +241,7 @@ export default function BotWorkspace() {
             notify={notify}
             onLog={pushLog}
             reload={load}
+            deploy={meta?.deploy}
           />
         )}
         {tab === 'teams' && (

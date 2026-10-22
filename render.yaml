@@ -1,38 +1,73 @@
-# Blueprint de Render para BotForge.
-# Un único servicio web con disco persistente: interfaz + API + WhatsApp/Teams reales.
+# Blueprint de Render para BotForge — pensado para funcionar SIN tarjeta (plan free).
 #
-# Notas:
-# - El disco persistente (disk) requiere un plan pago (starter o superior).
-# - En el plan free el servicio se duerme y no hay disco: los bots se pierden
-#   al reiniciar y WhatsApp no se mantiene conectado.
-# - Después del primer deploy, Render genera AUTH_TOKEN. Abrilo en el dashboard
-#   y entrá a https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN
+# Cómo desplegar:
+#   1. Render → New + → Blueprint → elegí este repositorio (rama main) → Apply.
+#   2. Cuando termine el deploy, abrí el servicio → Environment y copiá AUTH_TOKEN.
+#   3. Entrá a https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN
+#
+# Qué hace este archivo:
+#   - Crea un único servicio web que sirve la interfaz, la API, Socket.IO,
+#     WhatsApp (Baileys) y Microsoft Teams (Bot Framework).
+#   - Usa `plan: free`: NO pide tarjeta y Render acepta el blueprint tal cual.
+#
+# Límites del plan free (no son errores de la app):
+#   - El servicio se duerme tras ~15 min sin tráfico (~1 min para despertar).
+#   - No se puede montar un disco persistente: el filesystem es efímero, así que
+#     los bots y la sesión de WhatsApp se pierden en cada reinicio o redeploy.
+#   - 512 MB de RAM y 750 horas de instancia por mes.
+#
+# Para producción (bot 24/7 y sesión de WhatsApp que sobrevive reinicios):
+#   1. Cambiá `plan: free` por `plan: 0.5c-512mb` (≈ US$ 7/mes; equivale al
+#      antiguo plan starter) y agregá el bloque `disk:` que está comentado abajo.
+#   2. Agregá la variable DATA_DIR=/var/data y quitá EPHEMERAL_DATA.
+#   3. Redeploy. La sesión queda en /var/data/sessions.
+#
+# Notas de la especificación de Render:
+#   - `render.yaml` debe llamarse así y estar en la raíz del repositorio.
+#   - `runtime: node` es el campo actual (`env:` está deprecado).
+#   - Un `disk:` junto a `plan: free` hace que Render rechace TODO el blueprint
+#     con "disks are not supported for free tier services".
 
 services:
   - type: web
     name: botforge
-    plan: starter
-    region: virginia
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
-    autoDeploy: true
-    disk:
-      name: botforge-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_ENV
         value: production
       - key: NODE_VERSION
         value: "22"
-      - key: HOST
-        value: 0.0.0.0
-      - key: DATA_DIR
-        value: /var/data
       - key: AUTH_TOKEN
         generateValue: true
       - key: CORS_ORIGINS
         value: "*"
       - key: LOG_LEVEL
         value: silent
+      # Render Free no tiene disco: la interfaz muestra un aviso y DEPLOY.md
+      # explica cómo pasar al plan con disco.
+      - key: EPHEMERAL_DATA
+        value: "true"
+
+    # ── Producción 24/7 (requiere plan pago) ────────────────────────────────
+    # Cambiá `plan: free` por `plan: 0.5c-512mb`, agregá DATA_DIR y descomentá:
+    #
+    # disk:
+    #   name: botforge-data
+    #   mountPath: /var/data
+    #   sizeGB: 1
+    #
+    # envVars (agregar/modificar):
+    #   - key: DATA_DIR
+    #     value: /var/data
+    #   # y quitar EPHEMERAL_DATA (o ponerlo en "false")
+    #
+    # ── Secretos que conviene cargar a mano ─────────────────────────────────
+    # Para pedir valores en el dashboard al crear el servicio usá:
+    #   - key: AUTH_TOKEN
+    #     sync: false

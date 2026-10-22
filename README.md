@@ -90,12 +90,17 @@ npm start          # sirve interfaz + API en http://localhost:3001
 
 | Opción | Incluye | WhatsApp / Teams reales | Persistencia |
 | --- | --- | --- | --- |
-| **Render** (`render.yaml`) | App completa con disco de 1 GB | ✅ | ✅ |
+| **Render Free** (`render.yaml`) | App completa, sin tarjeta | ⚠️ Mientras está despierto | Efímera |
+| **Render + disco** (2 pasos) | App completa 24/7 | ✅ | ✅ 1 GB |
 | **Vercel** (`vercel.json`) | Editor + simulador (API serverless) | ❌ (501 explicativo) | Efímera |
 | **Vercel + Render** | UI en Vercel y proxy al backend | ✅ (QR por sondeo) | ✅ en Render |
 | **Docker / VPS** | Todo, con volumen propio | ✅ | ✅ |
 
-**Render (recomendado para bots reales):** New → Blueprint → conectá el repo → Apply. El blueprint crea el servicio, el disco en `/var/data` y un `AUTH_TOKEN` aleatorio. Abrí `https://tu-servicio.onrender.com/?token=…` para entrar. El disco persistente requiere plan pago.
+**Render:** New → Blueprint → conectá el repo (rama `main`) → Apply. El blueprint usa `plan: free`, así que Render lo acepta **sin pedir tarjeta**, genera un `AUTH_TOKEN` aleatorio y levanta todo en un servicio. Entrá con `https://tu-servicio.onrender.com/?token=…`.
+
+- El plan Free no permite discos: el panel avisa y los datos se pierden al reiniciar (el archivo trae `EPHEMERAL_DATA=true`).
+- Para un bot 24/7 hay que pasar a `plan: 0.5c-512mb` y descomentar el bloque `disk:` — está preparado en `render.yaml` y explicado en [DEPLOY.md](./DEPLOY.md#a2--plan-con-disco-bot-247-us-7mes).
+- ¿Preferís crearlo a mano? Los pasos están en [A3 · Sin blueprint](./DEPLOY.md#a3--sin-blueprint-todo-a-mano).
 
 **Vercel (demo/editor):** importá el repo y desplegá. La función `api/[...route].js` atiende la API (datos en `/tmp`, sin persistencia) y la interfaz avisa que WhatsApp/Teams reales necesitan un servidor persistente.
 
