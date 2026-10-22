@@ -1,8 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
+import { API_BASE, AUTH_TOKEN } from '../lib/config.js';
 import { useApi } from '../lib/useApi.js';
-import { Button, Card, Icon, Modal, StatusDot, useToast } from '../components/ui.jsx';
+import { Button, Icon, Modal, StatusDot, useToast } from '../components/ui.jsx';
 
 const fmt = new Intl.NumberFormat('es-UY');
 
@@ -12,14 +13,55 @@ export default function Bots() {
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [menu, setMenu] = useState(null);
+  const menuRef = useRef(null);
   const fileRef = useRef(null);
   const { notify } = useToast();
+
   const bots = data?.bots || [];
+
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onPointer = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) setMenu(null);
+    };
+    const onKey = (event) => event.key === 'Escape' && setMenu(null);
+    document.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [menu]);
+
+  const counts = useMemo(
+    () => ({
+      all: bots.length,
+      online: bots.filter((bot) => bot.whatsapp.connected).length,
+      offline: bots.filter((bot) => !bot.whatsapp.connected).length,
+    }),
+    [bots],
+  );
+
+  const visible = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return bots.filter((bot) => {
+      if (filter === 'online' && !bot.whatsapp.connected) return false;
+      if (filter === 'offline' && bot.whatsapp.connected) return false;
+      if (!term) return true;
+      return (
+        bot.name.toLowerCase().includes(term) ||
+        (bot.description || '').toLowerCase().includes(term)
+      );
+    });
+  }, [bots, filter, query]);
 
   const totals = useMemo(
     () => ({
       commands: bots.reduce((acc, bot) => acc + bot.commands, 0),
-      connected: bots.filter((bot) => bot.whatsapp.connected).length,
+      messages: bots.reduce((acc, bot) => acc + (bot.stats?.messages || 0), 0),
     }),
     [bots],
   );
@@ -66,14 +108,19 @@ export default function Bots() {
   };
 
   return (
-    <div className="page">
-      <header className="page-head">
-        <div>
-          <span className="eyebrow">Sesiones</span>
-          <h1>Mis Bots</h1>
-          <p>Bots de grupo guardados en este servidor. Todo lo que ves sale de la API real.</p>
+    <div className="page page-bots">
+      <section className="bots-hero">
+        <div className="bots-hero-text">
+          <span className="bots-hero-label">Sesiones activas</span>
+          <h1>
+            Mis Bots <span className="count-pill">{bots.length}</span>
+          </h1>
+          <p>
+            Cada bot usa su propia sesión de WhatsApp y responde solo en grupos. Los datos salen del
+            servidor en tiempo real.
+          </p>
         </div>
-        <div className="page-head-actions">
+        <div className="bots-hero-actions">
           <input ref={fileRef} type="file" accept="application/json" hidden onChange={importBot} />
           <Button variant="ghost" icon="upload" onClick={() => fileRef.current?.click()} loading={importing}>
             Importar
@@ -82,7 +129,7 @@ export default function Bots() {
             <Icon name="plus" size={17} /> Registrar bot
           </Link>
         </div>
-      </header>
+      </section>
 
       {meta?.deploy?.ephemeral ? (
         <div className="hint-box hint-warn">
@@ -94,153 +141,197 @@ export default function Bots() {
         </div>
       ) : null}
 
-      <div className="stat-row">
-        {[
-          { label: 'Bots creados', value: bots.length, icon: 'bot', tone: 'indigo' },
-          { label: 'Comandos activos', value: totals.commands, icon: 'command', tone: 'violet' },
-          { label: 'Sesiones en línea', value: totals.connected, icon: 'whatsapp', tone: 'emerald' },
-          {
-            label: 'Mensajes procesados',
-            value: bots.reduce((acc, bot) => acc + (bot.stats?.messages || 0), 0),
-            icon: 'activity',
-            tone: 'amber',
-          },
-        ].map((stat) => (
-          <div key={stat.label} className={`stat stat-${stat.tone}`}>
-            <span className="stat-icon">
-              <Icon name={stat.icon} size={18} />
-            </span>
-            <div>
-              <strong>{loading ? '—' : fmt.format(stat.value)}</strong>
-              <small>{stat.label}</small>
-            </div>
-          </div>
-        ))}
+      <div className="bots-toolbar">
+        <div className="bots-chips">
+          {[
+            { id: 'all', label: 'Todas', count: counts.all },
+            { id: 'online', label: 'En línea', count: counts.online },
+            { id: 'offline', label: 'Sin vincular', count: counts.offline },
+          ].map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`filter-chip ${filter === item.id ? 'is-active' : ''}`}
+              onClick={() => setFilter(item.id)}
+            >
+              {item.label}
+              <span>{item.count}</span>
+            </button>
+          ))}
+        </div>
+        <label className="search-box">
+          <Icon name="search" size={16} />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar bot por nombre"
+          />
+        </label>
       </div>
 
-      {!loading && !bots.length ? (
-        <Card className="hero-card">
-          <div className="hero-copy">
-            <span className="eyebrow">Empezá en dos minutos</span>
-            <h2>Tu primer bot para el grupo</h2>
-            <p>
-              Elegí una plantilla, ajustá los comandos y vinculá WhatsApp con QR o código. El bot
-              solo responde en grupos, nunca en chats privados.
-            </p>
-            <div className="hero-actions">
-              <Link className="btn btn-primary" to="/registrar">
-                <Icon name="plus" size={17} /> Registrar bot
-              </Link>
-              <Link className="btn btn-ghost" to="/catalogo">
-                Ver catálogo
-              </Link>
-            </div>
-          </div>
-          <div className="hero-art">
-            <div className="hero-phone">
-              <span>🤖</span>
-              <div className="hero-bubble">¡Hola! Soy el bot del grupo 👋</div>
-              <div className="hero-bubble hero-bubble-2">!menu</div>
-            </div>
-          </div>
-        </Card>
-      ) : null}
+      <div className="bots-summary">
+        <span>
+          <Icon name="command" size={14} /> {fmt.format(totals.commands)} comandos activos
+        </span>
+        <span>
+          <Icon name="activity" size={14} /> {fmt.format(totals.messages)} mensajes procesados
+        </span>
+        <span>
+          <Icon name="whatsapp" size={14} /> {counts.online} de {counts.all} en línea
+        </span>
+      </div>
 
-      <div className="bot-grid">
-        {bots.map((bot) => (
-          <Card key={bot.id} className="bot-card">
-            <div className="bot-card-top">
-              <span className="bot-avatar">{bot.emoji}</span>
-              <div className="bot-card-id">
-                <h3>{bot.name}</h3>
-                <p>{bot.description || 'Sin descripción'}</p>
+      {bots.length ? (
+        <div className="bots-grid">
+          {visible.map((bot) => (
+            <article key={bot.id} className="bot-tile">
+              <header className="bot-tile-head">
+                <span className="bot-tile-emoji">{bot.emoji}</span>
+                <div className="bot-tile-id">
+                  <h2>{bot.name}</h2>
+                  <small>{bot.description || 'Sin descripción'}</small>
+                </div>
+                <div
+                  className={`mini-dropdown ${menu === bot.id ? 'is-open' : ''}`}
+                  ref={menu === bot.id ? menuRef : null}
+                >
+                  <button
+                    className="icon-btn"
+                    title="Opciones del bot"
+                    aria-label={`Opciones de ${bot.name}`}
+                    aria-expanded={menu === bot.id}
+                    onClick={() => setMenu((prev) => (prev === bot.id ? null : bot.id))}
+                  >
+                    <Icon name="chevron" size={16} className="rot-down" />
+                  </button>
+                  <div className="mini-menu">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenu(null);
+                        duplicate(bot);
+                      }}
+                    >
+                      <Icon name="copy" size={14} /> Duplicar
+                    </button>
+                    <a
+                      href={`${API_BASE}/api/bots/${bot.id}/export${AUTH_TOKEN ? `?token=${encodeURIComponent(AUTH_TOKEN)}` : ''}`}
+                      download
+                      onClick={() => setMenu(null)}
+                    >
+                      <Icon name="download" size={14} /> Exportar
+                    </a>
+                    <button
+                      type="button"
+                      className="is-danger"
+                      onClick={() => {
+                        setMenu(null);
+                        setDeleting(bot);
+                      }}
+                    >
+                      <Icon name="trash" size={14} /> Eliminar
+                    </button>
+                  </div>
+                </div>
+              </header>
+
+              <div className={`bot-tile-status ${bot.whatsapp.connected ? 'is-online' : ''}`}>
+                <StatusDot
+                  status={
+                    bot.whatsapp.connected
+                      ? 'connected'
+                      : bot.whatsapp.status === 'error'
+                        ? 'error'
+                        : 'disconnected'
+                  }
+                  label={
+                    bot.whatsapp.connected
+                      ? `WhatsApp +${bot.whatsapp.phone}`
+                      : bot.whatsapp.status === 'error'
+                        ? 'Error de conexión'
+                        : 'Sin vincular'
+                  }
+                />
+                <span>
+                  {bot.stats?.lastActiveAt
+                    ? `Último mensaje ${new Date(bot.stats.lastActiveAt).toLocaleDateString('es-UY')}`
+                    : 'Sin actividad todavía'}
+                </span>
               </div>
-              <div className="mini-dropdown">
-                <button className="icon-btn" title="Opciones del bot" aria-label="Opciones">
-                  <Icon name="chevron" size={16} />
-                </button>
-                <div className="mini-menu">
-                  <button onClick={() => duplicate(bot)}>
-                    <Icon name="copy" size={14} /> Duplicar
-                  </button>
-                  <a href={`/api/bots/${bot.id}/export`} download>
-                    <Icon name="download" size={14} /> Exportar
-                  </a>
-                  <button className="is-danger" onClick={() => setDeleting(bot)}>
-                    <Icon name="trash" size={14} /> Eliminar
-                  </button>
+
+              <div className="bot-tile-chips">
+                <span>
+                  <Icon name="command" size={13} /> {bot.commands} comandos
+                </span>
+                <span>
+                  <Icon name="smile" size={13} /> {bot.reactions} reacciones
+                </span>
+                <span>
+                  <Icon name="text" size={13} /> {bot.texts} textos
+                </span>
+              </div>
+
+              <div className="bot-tile-stats">
+                <div>
+                  <strong>{fmt.format(bot.stats?.messages || 0)}</strong>
+                  <small>mensajes</small>
+                </div>
+                <div>
+                  <strong>{fmt.format(bot.stats?.replies || 0)}</strong>
+                  <small>respuestas</small>
+                </div>
+                <div>
+                  <strong>{fmt.format(bot.stats?.reactions || 0)}</strong>
+                  <small>reacciones</small>
                 </div>
               </div>
-            </div>
 
-            <div className="bot-card-chips">
-              <span className="chip">
-                <Icon name="command" size={13} /> {bot.commands} comandos
-              </span>
-              <span className="chip">
-                <Icon name="smile" size={13} /> {bot.reactions} reacciones
-              </span>
-              <span className="chip">
-                <Icon name="text" size={13} /> {bot.texts} textos
-              </span>
-            </div>
+              <div className="bot-tile-actions">
+                <Link className="bot-open" to={`/bots/${bot.id}/commands`}>
+                  Abrir <Icon name="chevron" size={15} />
+                </Link>
+                <Link className="bot-ghost" to={`/bots/${bot.id}/whatsapp`}>
+                  {bot.whatsapp.connected ? 'Sesión' : 'Vincular'}
+                </Link>
+              </div>
+            </article>
+          ))}
 
-            <div className="bot-card-channels">
-              <StatusDot
-                status={bot.whatsapp.connected ? 'connected' : bot.whatsapp.status === 'error' ? 'error' : 'disconnected'}
-                label={bot.whatsapp.connected ? `WhatsApp · +${bot.whatsapp.phone}` : 'WhatsApp sin vincular'}
-              />
-              <span className="muted small">
-                {bot.stats?.lastActiveAt
-                  ? `Último mensaje: ${new Date(bot.stats.lastActiveAt).toLocaleString('es-UY')}`
-                  : 'Sin actividad todavía'}
-              </span>
-            </div>
+          <Link to="/registrar" className="bot-tile bot-tile-new">
+            <span className="bot-tile-new-icon">
+              <Icon name="plus" size={24} />
+            </span>
+            <strong>Registrar otro bot</strong>
+            <small>Asistente de 5 pasos con plantilla incluida</small>
+          </Link>
+        </div>
+      ) : null}
 
-            <div className="bot-card-footer">
-              <span className="muted small">
-                {fmt.format(bot.stats?.messages || 0)} mensajes · {fmt.format(bot.stats?.replies || 0)}{' '}
-                respuestas
-              </span>
-              <Link className="btn btn-primary btn-sm" to={`/bots/${bot.id}/commands`}>
-                Abrir <Icon name="chevron" size={14} />
-              </Link>
-            </div>
-          </Card>
-        ))}
-
-        <Link to="/registrar" className="bot-card bot-card-new">
-          <span className="bot-new-icon">
-            <Icon name="plus" size={22} />
+      {!loading && !bots.length ? (
+        <div className="bots-empty">
+          <span className="bots-empty-icon">
+            <Icon name="bot" size={26} />
           </span>
-          <strong>Registrar otro bot</strong>
-          <small>Partí de una plantilla editable</small>
-        </Link>
-      </div>
+          <h2>Tu primer bot para el grupo</h2>
+          <p>
+            Elegí una instancia, vinculá WhatsApp por QR o código y sumá el número al grupo. Son
+            cinco pasos y no hace falta escribir código.
+          </p>
+          <Link className="continue-btn" to="/registrar">
+            Registrar bot <Icon name="chevron" size={18} />
+          </Link>
+        </div>
+      ) : null}
 
-      <Card className="info-strip">
-        <div className="info-item">
-          <Icon name="whatsapp" size={18} />
-          <div>
-            <strong>Solo grupos</strong>
-            <span>Los chats privados se ignoran por completo.</span>
-          </div>
+      {bots.length && !visible.length ? (
+        <div className="bots-empty">
+          <span className="bots-empty-icon">
+            <Icon name="search" size={26} />
+          </span>
+          <h2>Sin resultados</h2>
+          <p>Probá con otro nombre o cambiá el filtro de estado.</p>
         </div>
-        <div className="info-item">
-          <Icon name="qr" size={18} />
-          <div>
-            <strong>QR o código</strong>
-            <span>Vinculación por QR o pairing code de 8 dígitos.</span>
-          </div>
-        </div>
-        <div className="info-item">
-          <Icon name="crown" size={18} />
-          <div>
-            <strong>Catálogo</strong>
-            <span>Comandos de moderación, ventas y atención.</span>
-          </div>
-        </div>
-      </Card>
+      ) : null}
 
       <Modal
         open={Boolean(deleting)}
