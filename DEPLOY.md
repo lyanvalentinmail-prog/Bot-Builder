@@ -2,7 +2,7 @@
 
 BotForge incluye **blueprints listos** para Render y Vercel. Elegí según lo que necesites:
 
-| Opción | Qué obtenés | WhatsApp / Teams reales | Persistencia | Costo |
+| Opción | Qué obtenés | WhatsApp real | Persistencia | Costo |
 | --- | --- | --- | --- | --- |
 | **A1. Render Free (blueprint por defecto)** | App completa en un servicio | ⚠️ Mientras está despierto | Efímera | Gratis, sin tarjeta |
 | **A2. Render con disco** | App completa 24/7 | ✅ Sí, estable | Disco de 1 GB | ~US$ 7/mes |
@@ -103,9 +103,8 @@ No hace falta `AUTH_TOKEN`: sin esa variable el panel y la API quedan **abiertos
 
 ### Detalles comunes
 
-- **Un solo servicio hace todo:** interfaz, API, Socket.IO, WhatsApp y Teams. No configures variables `VITE_*`.
-- **Dominio propio:** Settings → Custom Domains; usá ese dominio para el endpoint de Teams.
-- **Webhooks de Teams:** `https://TU-SERVICIO.onrender.com/api/teams/<botId>/messages`.
+- **Un solo servicio hace todo:** interfaz, API, Socket.IO y WhatsApp. No configures variables `VITE_*`.
+- **Dominio propio:** Settings → Custom Domains; después definí `PUBLIC_URL` con ese dominio para que los enlaces del panel sean estables.
 - **Mantener despierto el plan free (opcional):** un monitor externo (cron-job.org, UptimeRobot) que haga `GET /api/health` cada 10 minutos evita el spin-down, pero consume las 750 h/mes y no reemplaza al disco: un redeploy igual borra los datos.
 - **Auto-deploy:** activo por defecto; cada push a `main` redeploya.
 
@@ -119,9 +118,9 @@ No hace falta `AUTH_TOKEN`: sin esa variable el panel y la API quedan **abiertos
 2. Framework: **Vite** (se detecta solo). `vercel.json` ya define build, salida y el catch-all de la API.
 3. Deploy. No hace falta configurar nada más.
 
-**Qué funciona:** interfaz completa, crear/editar bots, comandos, reacciones, textos, exportar/importar y simulador (WhatsApp y Teams). Los datos se guardan en `/tmp/botforge`, por lo que **se reinician** cuando la función se recicla.
+**Qué funciona:** interfaz completa, crear/editar bots, comandos, reacciones, textos, catálogo, métricas, exportar/importar y simulador. Los datos se guardan en `/tmp/botforge`, por lo que **se reinician** cuando la función se recicla.
 
-**Qué no funciona:** iniciar WhatsApp (QR o pairing) y activar Teams real. La API responde `501` con un mensaje explicativo y la interfaz muestra un aviso.
+**Qué no funciona:** iniciar WhatsApp (QR o pairing). La API responde `501` con un mensaje explicativo y la interfaz muestra un aviso.
 
 ```json
 // vercel.json (resumen)
@@ -138,7 +137,7 @@ La función `api/[...route].js` monta la API de Express para el editor. Si defin
 
 ## Opción C · Vercel + Render (lo mejor de ambos)
 
-La interfaz vive en Vercel (CDN global) y el backend persistente en Render (WhatsApp/Teams). El navegador **nunca** ve el token del backend: Vercel lo agrega del lado del servidor.
+La interfaz vive en Vercel (CDN global) y el backend persistente en Render (WhatsApp). El navegador **nunca** ve el token del backend: Vercel lo agrega del lado del servidor.
 
 1. Desplegá primero la **Opción A** y anotá:
    - URL del servicio: `https://botforge-xxxx.onrender.com`
@@ -158,7 +157,7 @@ La interfaz vive en Vercel (CDN global) y el backend persistente en Render (What
 
 - El proxy reenvía método, encabezados, cuerpo y query string. El token se inyecta como `x-auth-token` del lado del servidor.
 - **Socket.IO no atraviesa el proxy** (las funciones serverless no mantienen WebSockets). La pestaña WhatsApp sondea el estado cada 4 segundos, así que el QR, el pairing y la conexión funcionan igual; los logs en vivo solo se ven si usás Render directamente.
-- Para Teams, configurá como messaging endpoint la URL de **Render** (`/api/teams/<botId>/messages`), no la de Vercel.
+- La vinculación de WhatsApp y los grupos usan la sesión del backend de **Render**; no la inicies desde la URL de Vercel.
 - Alternativa sin proxy (no recomendada): apuntar la interfaz directo a Render con `VITE_API_URL`, `VITE_SOCKET_URL` y `VITE_AUTH_TOKEN`. Funciona, pero **el token queda dentro del bundle público** de Vercel.
 
 ---
@@ -171,7 +170,7 @@ docker compose up -d --build
 
 - Interfaz + API en `http://localhost:3001`.
 - Datos persistentes en `./data` (volumen).
-- Poné un reverse proxy con HTTPS (Caddy, Nginx, Traefik) y usá ese dominio para Teams.
+- Poné un reverse proxy con HTTPS (Caddy, Nginx, Traefik) y usá ese dominio como `PUBLIC_URL`.
 
 También podés usar `railway up`, `fly launch` o cualquier host que ejecute un proceso Node 22 con volumen persistente y permita WebSockets salientes.
 
@@ -214,7 +213,7 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 - [ ] HTTPS activo (Render y Vercel lo dan por defecto).
 - [ ] `DATA_DIR` apuntando a un disco persistente (Render) o volumen (Docker/VPS), con `EPHEMERAL_DATA` en `false`.
 - [ ] `CORS_ORIGINS` restringido si usás la API desde otro dominio.
-- [ ] Endpoint de Teams apuntando al backend persistente.
+- [ ] `PUBLIC_URL` apuntando al dominio público real.
 - [ ] Número de WhatsApp dedicado, sin envíos masivos.
 - [ ] Copia de seguridad de `db.json` y `sessions/` (contienen las credenciales).
 
@@ -236,7 +235,7 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 | Quiero que no pida clave | No definas `AUTH_TOKEN` (el blueprint ya no lo genera). Si lo habías agregado, borralo en Environment y redeployá. |
 | En Vercel todo se reinicia solo | El disco es efímero (`/tmp`). Pasá al modo proxy con Render. |
 | El proxy de Vercel devuelve 502 | `BACKEND_URL` mal escrita, backend dormido o token inválido. Probá `https://tu-backend.onrender.com/api/health`. |
-| Teams no recibe mensajes en el modo C | Configurá el endpoint de Teams con la URL de Render, no la de Vercel. |
+| La sesión de WhatsApp se pierde al reiniciar | Pasá a un plan con disco y `EPHEMERAL_DATA=false` (A2). |
 | El QR no se actualiza en el modo C | El sondeo es cada 4 s; esperá unos segundos o abrí directamente el panel de Render para ver los logs en vivo. |
 
 ---

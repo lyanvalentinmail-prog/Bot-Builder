@@ -27,7 +27,7 @@ test('crea, edita, duplica y elimina bots', () => {
   const copy = store.duplicateBot(bot.id);
   assert.notEqual(copy.id, bot.id);
   assert.equal(copy.commands[0].id !== bot.commands[0].id, true);
-  assert.equal(copy.channels.teams.appPassword, '');
+  assert.equal(copy.channels.teams, undefined);
 
   assert.equal(store.deleteBot(bot.id), true);
   assert.equal(store.getBot(bot.id), null);

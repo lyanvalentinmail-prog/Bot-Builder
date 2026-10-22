@@ -8,7 +8,7 @@ import CommandsTab from './tabs/CommandsTab.jsx';
 import ReactionsTab from './tabs/ReactionsTab.jsx';
 import TextsTab from './tabs/TextsTab.jsx';
 import WhatsAppTab from './tabs/WhatsAppTab.jsx';
-import TeamsTab from './tabs/TeamsTab.jsx';
+import GroupsTab from './tabs/GroupsTab.jsx';
 import SettingsTab from './tabs/SettingsTab.jsx';
 
 export default function BotWorkspace() {
@@ -19,7 +19,6 @@ export default function BotWorkspace() {
   const [meta, setMeta] = useState(null);
   const [error, setError] = useState(null);
   const [live, setLive] = useState({ status: 'disconnected', qr: null, pairingCode: null, phone: '' });
-  const [teamsStatus, setTeamsStatus] = useState({ status: 'not_configured' });
   const [logs, setLogs] = useState([]);
   const [testing, setTesting] = useState(false);
 
@@ -39,7 +38,6 @@ export default function BotWorkspace() {
           phone: botData.bot.channels.whatsapp.phone || '',
           me: botData.bot.channels.whatsapp.me,
         }));
-        setTeamsStatus(botData.bot.channels.teams);
         setError(null);
       } catch (err) {
         if (!silent) setError(err.message);
@@ -78,14 +76,6 @@ export default function BotWorkspace() {
       if (payload.botId !== botId) return;
       pushLog({ text: payload.text, level: payload.level || 'info', at: new Date().toISOString() });
     };
-    const onTeamsStatus = (payload) => {
-      if (payload.botId !== botId) return;
-      setTeamsStatus((prev) => ({ ...prev, ...payload }));
-    };
-    const onTeamsLog = (payload) => {
-      if (payload.botId !== botId) return;
-      pushLog({ text: payload.text, level: payload.level || 'info', at: new Date().toISOString() });
-    };
     const onStats = (payload) => {
       if (payload.botId !== botId) return;
       setBot((prev) => (prev ? { ...prev, stats: payload.stats } : prev));
@@ -103,11 +93,6 @@ export default function BotWorkspace() {
         at: new Date().toISOString(),
       }),
     );
-    socket.on('teams:status', onTeamsStatus);
-    socket.on('teams:log', onTeamsLog);
-    socket.on('teams:message', (p) =>
-      pushLog({ text: `👥 ${p.from}: ${p.text}`, level: 'info', at: new Date().toISOString() }),
-    );
     socket.on('stats:update', onStats);
 
     return () => {
@@ -117,9 +102,6 @@ export default function BotWorkspace() {
       socket.off('whatsapp:connected', onConnected);
       socket.off('whatsapp:log', onWaLog);
       socket.off('whatsapp:message');
-      socket.off('teams:status', onTeamsStatus);
-      socket.off('teams:log', onTeamsLog);
-      socket.off('teams:message');
       socket.off('stats:update', onStats);
     };
   }, [botId, load, pushLog]);
@@ -139,7 +121,7 @@ export default function BotWorkspace() {
       { id: 'reactions', label: 'Reacciones', icon: 'smile', badge: bot?.reactions.length },
       { id: 'texts', label: 'Textos', icon: 'text', badge: bot?.texts.length },
       { id: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp' },
-      { id: 'teams', label: 'Teams', icon: 'teams' },
+      { id: 'groups', label: 'Grupos', icon: 'users' },
       { id: 'settings', label: 'Ajustes', icon: 'settings' },
     ],
     [bot],
@@ -175,7 +157,7 @@ export default function BotWorkspace() {
     <div className="page page-workspace">
       <header className="workspace-head">
         <div className="workspace-title">
-          <Link to="/" className="icon-btn" title="Volver">
+          <Link to="/bots" className="icon-btn" title="Volver">
             <Icon name="arrowLeft" size={18} />
           </Link>
           <span className="bot-avatar bot-avatar-lg">{bot.emoji}</span>
@@ -197,10 +179,6 @@ export default function BotWorkspace() {
                       ? 'Esperando código'
                       : 'WhatsApp desconectado'
               }
-            />
-            <StatusDot
-              status={teamsStatus.status === 'ready' ? 'ready' : 'not_configured'}
-              label={teamsStatus.status === 'ready' ? 'Teams activo' : 'Teams inactivo'}
             />
           </div>
           <Button variant="secondary" icon="send" onClick={() => setTesting(true)}>
@@ -244,18 +222,7 @@ export default function BotWorkspace() {
             deploy={meta?.deploy}
           />
         )}
-        {tab === 'teams' && (
-          <TeamsTab
-            bot={bot}
-            setBot={setBot}
-            teamsStatus={teamsStatus}
-            setTeamsStatus={setTeamsStatus}
-            logs={logs}
-            notify={notify}
-            onLog={pushLog}
-            reload={load}
-          />
-        )}
+        {tab === 'groups' && <GroupsTab bot={bot} />}
         {tab === 'settings' && (
           <SettingsTab
             bot={bot}
@@ -281,7 +248,6 @@ export default function BotWorkspace() {
 /* ---------------------------- probador general --------------------------- */
 
 function TestModal({ open, onClose, bot, onStats }) {
-  const [channel, setChannel] = useState('whatsapp');
   const [messages, setMessages] = useState([]);
   const [typing, setTyping] = useState(false);
   const timers = useRef([]);
@@ -304,8 +270,8 @@ function TestModal({ open, onClose, bot, onStats }) {
     try {
       const res = await api.post(`/bots/${bot.id}/simulate`, {
         text,
-        channel,
         name: 'Ana',
+        groupName: 'Grupo Ventas',
       });
       const reaction = res.reactions?.[0]?.emoji;
       if (reaction) {
@@ -320,10 +286,7 @@ function TestModal({ open, onClose, bot, onStats }) {
           {
             id: `b-${Date.now()}`,
             from: 'bot',
-            text:
-              channel === 'teams'
-                ? 'No hay respuesta configurada para ese mensaje.'
-                : 'No hay respuesta configurada para ese mensaje. Revisá los comandos o el mensaje de respaldo.',
+            text: 'No hay respuesta configurada para ese mensaje. Revisá los comandos o el mensaje de respaldo.',
           },
         ]);
         return;
@@ -365,22 +328,10 @@ function TestModal({ open, onClose, bot, onStats }) {
     >
       <div className="test-layout">
         <div className="test-side">
-          <h4>Canal</h4>
-          <div className="segmented">
-            <button
-              className={channel === 'whatsapp' ? 'is-active' : ''}
-              onClick={() => setChannel('whatsapp')}
-            >
-              <Icon name="whatsapp" size={15} /> WhatsApp
-            </button>
-            <button className={channel === 'teams' ? 'is-active' : ''} onClick={() => setChannel('teams')}>
-              <Icon name="teams" size={15} /> Teams
-            </button>
-          </div>
+          <h4>Contexto</h4>
           <p className="muted small">
-            {channel === 'whatsapp'
-              ? 'Simula un chat de WhatsApp (incluye reacciones).'
-              : 'En Teams los comandos se aceptan con / o sin prefijo. Las reacciones nativas no se envían.'}
+            Simula un mensaje dentro de un grupo de WhatsApp, con reacciones y respuestas reales del
+            motor.
           </p>
 
           <h4>Comandos disponibles</h4>
@@ -403,14 +354,6 @@ function TestModal({ open, onClose, bot, onStats }) {
               ))}
           </div>
 
-          {channel === 'teams' ? (
-            <div className="hint-box">
-              <Icon name="warning" size={15} />
-              <span>
-                Para responder en Teams real necesitás credenciales de Azure Bot y una URL pública HTTPS.
-              </span>
-            </div>
-          ) : null}
         </div>
 
         <PhonePreview
@@ -420,7 +363,7 @@ function TestModal({ open, onClose, bot, onStats }) {
           typingMessage={typing ? 'typing' : ''}
           onSend={send}
           onReset={() => setMessages([])}
-          channel={channel === 'teams' ? 'Microsoft Teams' : 'WhatsApp'}
+          channel="WhatsApp"
           quickMessages={[`${bot.settings.prefix}menu`, `${bot.settings.prefix}ping`, 'hola']}
         />
       </div>

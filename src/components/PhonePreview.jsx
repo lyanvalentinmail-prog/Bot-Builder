@@ -137,7 +137,7 @@ export default function PhonePreview({
           </button>
         </form>
       </div>
-      {onSend ? <p className="phone-caption">Simulación local: no envía nada a WhatsApp ni Teams.</p> : null}
+      {onSend ? <p className="phone-caption">Simulación local: no envía nada a WhatsApp.</p> : null}
     </div>
   );
 }

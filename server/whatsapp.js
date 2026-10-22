@@ -62,6 +62,8 @@ function unwrap(msg) {
   return current;
 }
 
+const instanceOf = (manager, botId) => manager.instances.get(botId) || null;
+
 export class WhatsAppManager extends EventEmitter {
   constructor() {
     super();
@@ -187,6 +189,9 @@ export class WhatsAppManager extends EventEmitter {
       method,
       startedAt: Date.now(),
       seenContacts: new Set(),
+      seenGroups: new Map(),
+      groupsCache: null,
+      groupsAt: 0,
       failures: 0,
     };
     this.instances.set(botId, instance);
@@ -413,6 +418,65 @@ export class WhatsAppManager extends EventEmitter {
     });
   }
 
+  /** Guarda el grupo en la caché de la instancia (nombre + última actividad). */
+  trackGroup(instance, jid, name = '', actor = '') {
+    if (!instance || !jid) return;
+    const previous = instance.seenGroups.get(jid) || {};
+    instance.seenGroups.set(jid, {
+      id: jid,
+      name: name || previous.name || 'Grupo sin nombre',
+      lastActivityAt: new Date().toISOString(),
+      lastActor: actor || previous.lastActor || '',
+      messages: (previous.messages || 0) + 1,
+    });
+    instance.groupsCache = null;
+  }
+
+  /**
+   * Grupos donde está la sesión de WhatsApp del bot. Con `refresh` se consulta
+   * a WhatsApp; sin él se usa la caché para no golpear el socket.
+   */
+  async groups(botId, { refresh = false } = {}) {
+    const instance = this.instances.get(botId);
+    if (!instance || instance.status !== 'connected' || !instance.sock) {
+      return { connected: false, status: instance?.status || 'disconnected', groups: [] };
+    }
+    const fresh = Date.now() - instance.groupsAt < 60_000;
+    if (!refresh && fresh && instance.groupsCache) {
+      return { connected: true, status: instance.status, groups: instance.groupsCache };
+    }
+    let groups = [];
+    try {
+      const all = await instance.sock.groupFetchAllParticipating();
+      groups = Object.entries(all || {}).map(([id, meta]) => ({
+        id,
+        name: meta?.subject || 'Grupo sin nombre',
+        participants: Array.isArray(meta?.participants) ? meta.participants.length : 0,
+        announce: Boolean(meta?.announce),
+        lastActivityAt: instance.seenGroups.get(id)?.lastActivityAt || null,
+        messages: instance.seenGroups.get(id)?.messages || 0,
+      }));
+    } catch (error) {
+      this.emitToRoom(botId, 'whatsapp:log', {
+        botId,
+        text: `No se pudo leer la lista de grupos: ${error.message}`,
+        level: 'warn',
+      });
+      groups = [...instance.seenGroups.values()].map((group) => ({
+        id: group.id,
+        name: group.name,
+        participants: 0,
+        announce: false,
+        lastActivityAt: group.lastActivityAt,
+        messages: group.messages || 0,
+      }));
+    }
+    groups.sort((a, b) => (b.messages || 0) - (a.messages || 0));
+    instance.groupsCache = groups;
+    instance.groupsAt = Date.now();
+    return { connected: true, status: instance.status, groups };
+  }
+
   async groupName(sock, jid) {
     if (!jid || !jid.endsWith('@g.us')) return '';
     const cached = this.groupCache.get(jid);
@@ -439,6 +503,8 @@ export class WhatsAppManager extends EventEmitter {
     if (!jid || jid === 'status@broadcast' || jid.endsWith('@newsletter')) return;
 
     const isGroup = jid.endsWith('@g.us');
+    // BotForge es un producto para grupos: los chats privados se ignoran por completo.
+    if (!isGroup) return;
     const senderJid = message.key.participant || jid;
     const senderNumber = digitsOnly(senderJid.split('@')[0].split(':')[0]);
     const text = String(extractText(message) || '').trim();
@@ -452,8 +518,8 @@ export class WhatsAppManager extends EventEmitter {
       ),
     );
 
-    // Los grupos se ignoran por configuración (salvo que mencionen al bot).
-    if (isGroup && bot.settings.ignoreGroups && !mentionedMe) return;
+    // Opcional: responder solo cuando mencionan al bot.
+    if (bot.settings.requireMention && !mentionedMe) return;
 
     if (bot.settings.readReceipts) {
       try {
@@ -463,7 +529,8 @@ export class WhatsAppManager extends EventEmitter {
       }
     }
 
-    const groupName = isGroup ? await this.groupName(sock, jid) : '';
+    const groupName = await this.groupName(sock, jid);
+    this.trackGroup(instanceOf(this, botId), jid, groupName, message.pushName || senderNumber);
     const nowDate = new Date();
     const ctx = {
       isGroup,
@@ -620,6 +687,7 @@ export class WhatsAppManager extends EventEmitter {
     }
 
     bot.stats.messages += 1;
+    bot.stats.lastActiveAt = new Date().toISOString();
     store.saveBot(bot);
     if (result.matched) {
       const cmd = result.command;

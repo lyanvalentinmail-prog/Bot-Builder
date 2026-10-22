@@ -50,12 +50,12 @@ test('coincidencia exacta, contiene, empieza con y regex', () => {
   assert.equal(matchesCommand(cmd({ trigger: 'x', matchType: 'any' }), 'lo que sea', settings), true);
 });
 
-test('respeta el alcance y el estado del comando', () => {
-  const dmOnly = cmd({ trigger: 'menu', scope: 'dm' });
+test('respeta el alcance de grupo y el estado del comando', () => {
   const groupOnly = cmd({ trigger: 'menu', scope: 'group' });
-  assert.equal(matchesCommand(dmOnly, '!menu', settings, { isGroup: true }), false);
-  assert.equal(matchesCommand(dmOnly, '!menu', settings, { isGroup: false }), true);
   assert.equal(matchesCommand(groupOnly, '!menu', settings, { isGroup: true }), true);
+  assert.equal(matchesCommand(groupOnly, '!menu', settings, { isGroup: false }), false);
+  // «dm» ya no es un alcance válido: se normaliza a «all».
+  assert.equal(cmd({ trigger: 'menu', scope: 'dm' }).scope, 'all');
   assert.equal(matchesCommand(cmd({ trigger: 'menu', enabled: false }), '!menu', settings), false);
 });
 
@@ -87,6 +87,15 @@ test('render reemplaza variables y plantillas anidadas', () => {
   );
 });
 
+test('el bot nace configurado solo para grupos de WhatsApp', () => {
+  const bot = newBot({ name: 'Grupos' });
+  assert.equal(bot.channels.teams, undefined);
+  assert.ok(bot.channels.whatsapp);
+  assert.equal(bot.settings.requireMention, false);
+  assert.equal(bot.settings.ignoreGroups, undefined);
+  assert.equal('dm' in bot.settings, false);
+});
+
 test('buildVariables arma datos de ejemplo', () => {
   const vars = buildVariables({ name: 'Bot', settings: { prefix: '#' } }, { name: 'Ana', text: 'hola' });
   assert.equal(vars.nombre, 'Ana');
@@ -108,8 +117,11 @@ test('la reacción automática respeta probabilidad, alcance y comandos', () => 
     null,
   );
   assert.equal(
-    chooseAutoReaction({ ...bot, autoReact: { ...bot.autoReact, scope: 'dm' } }, { text: 'hola' }, true),
+    chooseAutoReaction({ ...bot, autoReact: { ...bot.autoReact, scope: 'group' } }, { text: 'hola' }, false),
     null,
+  );
+  assert.ok(
+    chooseAutoReaction({ ...bot, autoReact: { ...bot.autoReact, scope: 'group' } }, { text: 'hola' }, true),
   );
   assert.equal(chooseAutoReaction({ ...bot, autoReact: { enabled: false } }, { text: 'hola' }, false), null);
 });

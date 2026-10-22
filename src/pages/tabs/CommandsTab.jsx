@@ -398,9 +398,8 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
                 </Field>
                 <Field label="Dónde responde">
                   <Select value={draft.scope} onChange={(e) => update({ scope: e.target.value })}>
-                    <option value="all">Todos los chats</option>
-                    <option value="dm">Solo privados</option>
-                    <option value="group">Solo grupos</option>
+                    <option value="all">Todos los mensajes del grupo</option>
+                    <option value="group">Solo en grupos</option>
                   </Select>
                 </Field>
               </div>
