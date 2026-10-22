@@ -34,25 +34,33 @@ export default function WhatsAppTab({ bot, setBot, live, setLive, logs, notify, 
   const status = live.status || 'disconnected';
   const busy = ['connecting', 'qr', 'pairing'].includes(status);
 
+  // Sondeo de respaldo: mantiene QR y estado al día incluso si Socket.IO no está
+  // disponible (por ejemplo, frontend en Vercel con proxy hacia Render).
   useEffect(() => {
-    if (!busy) return undefined;
     const interval = setInterval(async () => {
       try {
         const data = await api.get(`/bots/${bot.id}/whatsapp`);
         const next = data.whatsapp;
-        setLive((prev) => ({
-          ...prev,
-          status: next.status || prev.status,
-          phone: next.phone || prev.phone,
-          qr: next.qr || prev.qr,
-          pairingCode: next.pairingCode || prev.pairingCode,
-        }));
+        setLive((prev) => {
+          const status = next.status || prev.status;
+          const qr = next.qr || prev.qr;
+          const pairingCode = next.pairingCode || prev.pairingCode;
+          if (
+            status === prev.status &&
+            qr === prev.qr &&
+            pairingCode === prev.pairingCode &&
+            (next.phone || '') === (prev.phone || '')
+          ) {
+            return prev;
+          }
+          return { ...prev, status, phone: next.phone || prev.phone, qr, pairingCode };
+        });
       } catch {
         /* el socket es la fuente principal */
       }
     }, 4000);
     return () => clearInterval(interval);
-  }, [busy, bot.id, setLive]);
+  }, [bot.id, setLive]);
 
   const start = async () => {
     setStarting(true);

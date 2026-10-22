@@ -20,6 +20,7 @@ import {
   defaultAutoReact,
 } from './defaults.js';
 import { asString, digitsOnly, uid, clamp } from './util.js';
+import { AUTH_TOKEN, CORS_ORIGINS, IS_SERVERLESS, PUBLIC_URL } from './config.js';
 
 export const api = express.Router();
 
@@ -169,6 +170,16 @@ api.get('/meta', (req, res) => {
     limits: { commands: 60, reactions: 40, texts: 40, aliases: 10 },
     whatsappEngine: 'Baileys (WhatsApp Web multi-dispositivo)',
     teamsEngine: 'Bot Framework SDK v4',
+    deploy: {
+      serverless: IS_SERVERLESS,
+      persistentChannels: !IS_SERVERLESS,
+      authRequired: Boolean(AUTH_TOKEN),
+      corsOrigins: CORS_ORIGINS,
+      publicUrl: PUBLIC_URL,
+      hint: IS_SERVERLESS
+        ? 'Estás en un entorno serverless (Vercel): el editor y el simulador funcionan, pero WhatsApp y Teams reales necesitan un servidor persistente con disco (Render, Railway, Fly.io o un VPS).'
+        : 'Servidor persistente: podés vincular WhatsApp por QR o código y activar el canal de Teams.',
+    },
   });
 });
 
@@ -443,6 +454,13 @@ api.get('/bots/:id/whatsapp', requireBot, (req, res) => {
 });
 
 api.post('/bots/:id/whatsapp/start', requireBot, async (req, res) => {
+  if (IS_SERVERLESS) {
+    return res.status(501).json({
+      error:
+        'La vinculación real de WhatsApp requiere un servidor persistente (Render, Railway o un VPS): las funciones serverless no mantienen la conexión WebSocket ni el disco de sesión. Podés probar todo el editor y el simulador acá.',
+      code: 'SERVERLESS_WHATSAPP_UNSUPPORTED',
+    });
+  }
   const method = req.body?.method === 'pairing' ? 'pairing' : 'qr';
   const phone = digitsOnly(req.body?.phone || req.bot.channels.whatsapp.phone || '');
   if (method === 'pairing' && phone.length < 8) {
@@ -470,6 +488,12 @@ api.get('/bots/:id/whatsapp/qr', requireBot, (req, res) => {
 });
 
 api.post('/bots/:id/whatsapp/test', requireBot, async (req, res) => {
+  if (IS_SERVERLESS) {
+    return res.status(501).json({
+      error: 'El envío de mensajes de prueba necesita un servidor persistente con WhatsApp conectado.',
+      code: 'SERVERLESS_WHATSAPP_UNSUPPORTED',
+    });
+  }
   const jid = asString(req.body?.jid, 40).trim();
   const text = asString(req.body?.text, 2000).trim();
   if (!jid || !text) return res.status(400).json({ error: 'Indicá número y mensaje' });
@@ -505,6 +529,13 @@ api.put('/bots/:id/teams/credentials', requireBot, async (req, res) => {
 });
 
 api.post('/bots/:id/teams/start', requireBot, async (req, res) => {
+  if (IS_SERVERLESS) {
+    return res.status(501).json({
+      error:
+        'El canal de Teams necesita un servidor persistente para mantener las credenciales y validar sesiones. En serverless podés guardar las credenciales y usar el simulador, pero no activar el canal.',
+      code: 'SERVERLESS_TEAMS_UNSUPPORTED',
+    });
+  }
   try {
     const status = await teams.start(req.bot.id);
     res.json({ ok: true, teams: status });

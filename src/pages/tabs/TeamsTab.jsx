@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { api } from '../../lib/api.js';
+import { API_BASE } from '../../lib/config.js';
 import PhonePreview from '../../components/PhonePreview.jsx';
 import {
   Button,
@@ -31,9 +32,10 @@ export default function TeamsTab({ bot, setBot, teamsStatus, setTeamsStatus, log
     return `${hex}-${hex2}-4b1e-9f2a-${tail}`;
   }, [bot.id]);
 
+  const apiOrigin = API_BASE || window.location.origin;
   const endpoint = useMemo(
-    () => `${window.location.origin}/api/teams/${bot.id}/messages`,
-    [bot.id],
+    () => `${apiOrigin}/api/teams/${bot.id}/messages`,
+    [apiOrigin, bot.id],
   );
 
   const manifest = useMemo(
@@ -57,7 +59,7 @@ export default function TeamsTab({ bot, setBot, teamsStatus, setTeamsStatus, log
           accentColor: '#6366f1',
           bots: [{ botId: appId || 'PEGAR-APP-ID', scopes: ['personal', 'team', 'groupchat'], isNotificationOnly: false, supportsFiles: false }],
           permissions: ['identity', 'messageTeamMembers'],
-          validDomains: [window.location.hostname],
+          validDomains: [new URL(apiOrigin).hostname],
         },
         null,
         2,

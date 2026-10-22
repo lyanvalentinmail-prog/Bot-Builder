@@ -13,6 +13,7 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 - 👥 **Publicar el mismo bot en Microsoft Teams** con credenciales de Azure Bot.
 - 🧪 Probar todo en un simulador de teléfono antes de conectar nada.
 - 💾 Exportar/importar la configuración y duplicar bots.
+- ☁️ **Blueprints de Render y Vercel** incluidos (`render.yaml` / `vercel.json`), además de Docker.
 
 ---
 
@@ -25,7 +26,7 @@ BotForge es una aplicación web completa (frontend + backend + motores de mensaj
 5. [Microsoft Teams paso a paso](#microsoft-teams-paso-a-paso)
 6. [Variables disponibles](#variables-disponibles)
 7. [Configuración (.env)](#configuración-env)
-8. [Producción y Docker](#producción-y-docker)
+8. [Despliegue (Render / Vercel / Docker)](#despliegue-render--vercel--docker)
 9. [API HTTP](#api-http)
 10. [Estructura del proyecto](#estructura-del-proyecto)
 11. [Tests](#tests)
@@ -79,6 +80,28 @@ Abrí **http://localhost:5173**.
 npm run build      # compila la interfaz en dist/
 npm start          # sirve interfaz + API en http://localhost:3001
 ```
+
+---
+
+## Despliegue (Render / Vercel / Docker)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyanvalentinmail-prog/Bot-Builder)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/lyanvalentinmail-prog/Bot-Builder)
+
+| Opción | Incluye | WhatsApp / Teams reales | Persistencia |
+| --- | --- | --- | --- |
+| **Render** (`render.yaml`) | App completa con disco de 1 GB | ✅ | ✅ |
+| **Vercel** (`vercel.json`) | Editor + simulador (API serverless) | ❌ (501 explicativo) | Efímera |
+| **Vercel + Render** | UI en Vercel y proxy al backend | ✅ (QR por sondeo) | ✅ en Render |
+| **Docker / VPS** | Todo, con volumen propio | ✅ | ✅ |
+
+**Render (recomendado para bots reales):** New → Blueprint → conectá el repo → Apply. El blueprint crea el servicio, el disco en `/var/data` y un `AUTH_TOKEN` aleatorio. Abrí `https://tu-servicio.onrender.com/?token=…` para entrar. El disco persistente requiere plan pago.
+
+**Vercel (demo/editor):** importá el repo y desplegá. La función `api/[...route].js` atiende la API (datos en `/tmp`, sin persistencia) y la interfaz avisa que WhatsApp/Teams reales necesitan un servidor persistente.
+
+**Vercel + Render (backend real, token oculto):** desplegá primero Render y en Vercel definí `BACKEND_URL` y `BACKEND_TOKEN` (variables de servidor). Vercel proxea `/api` a Render y agrega el token del lado servidor, sin exponerlo al navegador.
+
+📘 **Guía completa con pasos, variables y solución de problemas: [DEPLOY.md](./DEPLOY.md).**
 
 ---
 
@@ -210,13 +233,20 @@ Copiá `.env.example` a `.env` (o definí las variables en el entorno):
 | `DATA_DIR` | `./data` | Carpeta de datos y sesiones |
 | `AUTH_TOKEN` | *(vacío)* | Si se define, protege panel y API con token (`?token=…` o cabecera `x-auth-token`) |
 | `PUBLIC_URL` | *(vacío)* | URL pública usada en enlaces/documentación |
+| `CORS_ORIGINS` | `*` | Orígenes permitidos para CORS (`*` o lista separada por comas) |
 | `LOG_LEVEL` | `silent` | Nivel de logs de Baileys (`info`, `debug`, `silent`) |
+| `BACKEND_URL` | *(vacío)* | Solo en Vercel: backend persistente al que proxear `/api` |
+| `BACKEND_TOKEN` | *(vacío)* | Solo en Vercel: token del backend inyectado del lado servidor |
+
+Variables del **build** del frontend (solo si la interfaz se sirve separada del backend, ej. Vercel → Render sin proxy): `VITE_API_URL`, `VITE_SOCKET_URL` y `VITE_AUTH_TOKEN` (esta última queda visible en el bundle: usala solo para demos).
 
 > ⚠️ Si exponés BotForge a internet, definí **siempre** `AUTH_TOKEN` y usá HTTPS.
 
 ---
 
-## Producción y Docker
+## Producción y Docker (servidor propio)
+
+> Guía detallada de Render y Vercel en **[DEPLOY.md](./DEPLOY.md)**.
 
 ### Servidor propio
 
@@ -285,7 +315,8 @@ Todas las rutas cuelgan de `/api`.
 
 ```
 server/
-  index.js       Express + Socket.IO + webhooks + estáticos
+  app.js         App Express reutilizable (API, webhooks, estáticos, seguridad)
+  index.js       Runtime persistente: HTTP + Socket.IO + apagado ordenado
   api.js         Rutas REST y validaciones
   engine.js      Motor de reglas (coincidencias, reacciones, respuestas)
   template.js    Variables, plantillas y fechas
@@ -299,8 +330,13 @@ src/
   pages/         Dashboard, espacio de trabajo y pestañas del editor
   components/    UI (botones, modales, toasts) y previsualización de teléfono
   lib/           Cliente API, socket, variables y formato WhatsApp
+api/
+  [...route].js  Función serverless de Vercel (API demo o proxy a BACKEND_URL)
+render.yaml      Blueprint de Render (disco persistente + variables)
+vercel.json      Blueprint de Vercel (Vite + función + rewrites)
+DEPLOY.md        Guía de despliegue paso a paso
 test/
-  engine.test.js, storage.test.js
+  engine.test.js, storage.test.js, api.test.js
 ```
 
 ---
@@ -311,12 +347,13 @@ test/
 npm test
 ```
 
-Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y plantillas anidadas, construcción de respuestas (texto, botones, frases al azar, edición, firma), reacciones automáticas y personalizadas, respaldo/comando desconocido y persistencia del almacenamiento.
+Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y plantillas anidadas, construcción de respuestas (texto, botones, frases al azar, edición, firma), reacciones automáticas y personalizadas, respaldo/comando desconocido, persistencia del almacenamiento y la capa HTTP (health, CORS, creación/simulación de bots, bloqueo de canales en serverless y 404 en JSON).
 
 ---
 
 ## Límites, seguridad y buenas prácticas
 
+- **Serverless (Vercel):** el editor y el simulador funcionan, pero WhatsApp/Teams reales requieren un servidor persistente con disco (Render o VPS). En Vercel los datos se guardan en `/tmp` y se reinician.
 - **No hay autenticación por defecto.** Pensado para uso local o detrás de una red privada. En internet, definí `AUTH_TOKEN` y HTTPS.
 - **WhatsApp no oficial:** Baileys usa el protocolo de WhatsApp Web. No está afiliado a Meta. Un uso abusivo (spam, envíos masivos, suplantación) puede provocar la suspensión del número.
 - **Un dispositivo por sesión:** cada bot mantiene su propia sesión. No vincules el mismo número en dos bots al mismo tiempo.

@@ -1,13 +1,11 @@
-const tokenFromUrl =
-  typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('token') : null;
+import { API_BASE, AUTH_TOKEN } from './config.js';
 
-const authHeaders = tokenFromUrl ? { 'x-auth-token': tokenFromUrl } : {};
+const authHeaders = AUTH_TOKEN ? { 'x-auth-token': AUTH_TOKEN } : {};
 
 async function request(path, options = {}) {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     headers: { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...authHeaders },
     ...options,
-    body: options.body ? JSON.stringify(options.body) : undefined,
   });
   const text = await res.text();
   let data = null;
@@ -19,6 +17,7 @@ async function request(path, options = {}) {
   if (!res.ok) {
     const error = new Error(data?.error || `Error ${res.status}`);
     error.status = res.status;
+    error.code = data?.code;
     error.data = data;
     throw error;
   }

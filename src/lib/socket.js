@@ -1,19 +1,18 @@
 import { io } from 'socket.io-client';
+import { AUTH_TOKEN, SOCKET_URL } from './config.js';
 
 let socket = null;
 
 export function getSocket() {
   if (!socket) {
-    const token =
-      typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('token')
-        : null;
-    socket = io({
-      auth: token ? { token } : undefined,
+    socket = io(SOCKET_URL, {
+      auth: AUTH_TOKEN ? { token: AUTH_TOKEN } : undefined,
       path: '/socket.io',
       transports: ['websocket', 'polling'],
       reconnectionDelay: 800,
       reconnectionDelayMax: 4000,
+      // En un backend externo (Render) el socket cruza dominios.
+      withCredentials: false,
     });
   }
   return socket;

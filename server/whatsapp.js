@@ -14,6 +14,7 @@ import {
   render,
 } from './template.js';
 import { delay, digitsOnly, sleep } from './util.js';
+import { optionalImport } from './optional.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'silent' });
 
@@ -134,7 +135,7 @@ export class WhatsAppManager extends EventEmitter {
 
     let baileys;
     try {
-      baileys = await import('@whiskeysockets/baileys');
+      baileys = await optionalImport('@whiskeysockets/baileys');
     } catch (error) {
       this.setStatus({ botId, status: 'error', phone, lastError: null }, 'error', {
         lastError: `No se pudo cargar el motor de WhatsApp: ${error.message}`,

@@ -1599,6 +1599,16 @@ code {
   margin-top: 1px;
 }
 
+.deploy-banner {
+  padding: 12px 14px;
+  font-size: 12px;
+  align-items: center;
+}
+
+.deploy-banner strong {
+  color: #ffe0ae;
+}
+
 .hint-warn {
   background: rgba(245, 165, 36, 0.08);
   border-color: rgba(245, 165, 36, 0.26);

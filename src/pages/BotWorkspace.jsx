@@ -209,6 +209,15 @@ export default function BotWorkspace() {
         </div>
       </header>
 
+      {meta?.deploy?.serverless ? (
+        <div className="hint-box hint-warn deploy-banner">
+          <Icon name="warning" size={16} />
+          <span>
+            <strong>Modo serverless (Vercel).</strong> {meta.deploy.hint}
+          </span>
+        </div>
+      ) : null}
+
       <Tabs tabs={tabs} value={tab} onChange={(next) => navigate(`/bots/${botId}/${next}`)} />
 
       <div className="workspace-body">

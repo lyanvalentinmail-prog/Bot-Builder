@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { optionalImport } from './optional.js';
 import { store } from './storage.js';
 import { processMessage, findCommand } from './engine.js';
 import {
@@ -38,7 +39,7 @@ export class TeamsManager extends EventEmitter {
     if (!appId || !appPassword) {
       throw new Error('Faltan App ID y App Password de Azure');
     }
-    const botbuilder = await import('botbuilder');
+    const botbuilder = await optionalImport('botbuilder');
     const { BotFrameworkAdapter, MemoryStorage, ConversationState, UserState } = botbuilder;
     const adapter = new BotFrameworkAdapter({
       appId,
@@ -289,7 +290,7 @@ export class TeamsManager extends EventEmitter {
                 ],
               });
             } else if (action.kind === 'buttons') {
-              const { CardFactory } = await import('botbuilder');
+              const { CardFactory } = await optionalImport('botbuilder');
               try {
                 await context.sendActivity({
                   text: action.text,

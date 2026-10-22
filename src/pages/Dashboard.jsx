@@ -138,6 +138,15 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {meta?.deploy?.serverless ? (
+        <div className="hint-box hint-warn deploy-banner">
+          <Icon name="warning" size={16} />
+          <span>
+            <strong>Estás en Vercel (serverless).</strong> {meta.deploy.hint}
+          </span>
+        </div>
+      ) : null}
+
       <div className="stat-row">
         {[
           { label: 'Bots creados', value: totals.bots, icon: 'bot', tone: 'indigo' },
