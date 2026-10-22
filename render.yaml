@@ -1,0 +1,38 @@
+# Blueprint de Render para BotForge.
+# Un único servicio web con disco persistente: interfaz + API + WhatsApp/Teams reales.
+#
+# Notas:
+# - El disco persistente (disk) requiere un plan pago (starter o superior).
+# - En el plan free el servicio se duerme y no hay disco: los bots se pierden
+#   al reiniciar y WhatsApp no se mantiene conectado.
+# - Después del primer deploy, Render genera AUTH_TOKEN. Abrilo en el dashboard
+#   y entrá a https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN
+
+services:
+  - type: web
+    name: botforge
+    plan: starter
+    region: virginia
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: botforge-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data
+      - key: AUTH_TOKEN
+        generateValue: true
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: LOG_LEVEL
+        value: silent

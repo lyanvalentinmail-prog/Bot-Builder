@@ -1,0 +1,10 @@
+node_modules
+data
+dist
+.git
+.tmp-ssr
+test
+*.log
+.env
+.env.*
+!.env.example
