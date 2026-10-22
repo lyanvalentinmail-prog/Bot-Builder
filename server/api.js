@@ -20,7 +20,15 @@ import {
   defaultAutoReact,
 } from './defaults.js';
 import { asString, digitsOnly, uid, clamp } from './util.js';
-import { AUTH_TOKEN, CORS_ORIGINS, IS_SERVERLESS, PUBLIC_URL } from './config.js';
+import {
+  AUTH_TOKEN,
+  CORS_ORIGINS,
+  DATA_DIR,
+  EPHEMERAL_DATA,
+  IS_SERVERLESS,
+  PUBLIC_URL,
+} from './config.js';
+import { deployInfo } from './deploy.js';
 
 export const api = express.Router();
 
@@ -170,16 +178,14 @@ api.get('/meta', (req, res) => {
     limits: { commands: 60, reactions: 40, texts: 40, aliases: 10 },
     whatsappEngine: 'Baileys (WhatsApp Web multi-dispositivo)',
     teamsEngine: 'Bot Framework SDK v4',
-    deploy: {
+    deploy: deployInfo({
       serverless: IS_SERVERLESS,
-      persistentChannels: !IS_SERVERLESS,
-      authRequired: Boolean(AUTH_TOKEN),
+      ephemeralData: EPHEMERAL_DATA,
+      authToken: AUTH_TOKEN,
       corsOrigins: CORS_ORIGINS,
       publicUrl: PUBLIC_URL,
-      hint: IS_SERVERLESS
-        ? 'Estás en un entorno serverless (Vercel): el editor y el simulador funcionan, pero WhatsApp y Teams reales necesitan un servidor persistente con disco (Render, Railway, Fly.io o un VPS).'
-        : 'Servidor persistente: podés vincular WhatsApp por QR o código y activar el canal de Teams.',
-    },
+      dataDir: DATA_DIR,
+    }),
   });
 });
 

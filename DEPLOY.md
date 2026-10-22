@@ -4,58 +4,106 @@ BotForge incluye **blueprints listos** para Render y Vercel. Elegí según lo qu
 
 | Opción | Qué obtenés | WhatsApp / Teams reales | Persistencia | Costo |
 | --- | --- | --- | --- | --- |
-| **A. Render (blueprint)** | App completa en un solo servicio | ✅ Sí | Disco de 1 GB | Plan pago (disk) |
+| **A1. Render Free (blueprint por defecto)** | App completa en un servicio | ⚠️ Mientras está despierto | Efímera | Gratis, sin tarjeta |
+| **A2. Render con disco** | App completa 24/7 | ✅ Sí, estable | Disco de 1 GB | ~US$ 7/mes |
 | **B. Vercel (serverless)** | Editor + simulador | ❌ No | Efímera (`/tmp`) | Gratis |
 | **C. Vercel + Render (proxy)** | UI en Vercel, backend persistente | ✅ Sí (QR por sondeo) | Disco de Render | Ambos |
 | **D. Docker / VPS** | Todo, control total | ✅ Sí | Volumen propio | Tu servidor |
 
-> **Por qué WhatsApp no funciona en Vercel:** la vinculación necesita una conexión WebSocket abierta permanentemente y un disco donde guardar la sesión. Las funciones serverless se apagan y su disco es temporal. Por eso el blueprint de Render (servicio persistente + disco) es el recomendado. Vercel sirve perfecto para la interfaz y para el editor.
+> **El blueprint incluido usa `plan: free`** para que Render lo acepte sin pedir tarjeta. Si Render rechazaba el deploy con *«disks are not supported for free tier services»*, esa era la causa: un `disk:` junto a `plan: free` invalida **todo** el blueprint. El bloque con disco quedó comentado dentro de `render.yaml` y se activa en dos pasos (ver A2).
+
+> **Por qué WhatsApp no funciona en Vercel:** la vinculación necesita una conexión WebSocket abierta permanentemente y un disco donde guardar la sesión. Las funciones serverless se apagan y su disco es temporal.
 
 ---
 
-## Opción A · Render (recomendada)
+## Opción A · Render (blueprint)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/lyanvalentinmail-prog/Bot-Builder)
 
-1. Subí el repositorio a GitHub (rama principal con estos archivos).
-2. En [Render](https://dashboard.render.com) → **New → Blueprint**.
-3. Conectá el repositorio. Render detecta `render.yaml` y muestra el servicio `botforge`.
-4. Tocá **Apply / Deploy**. El build corre `npm ci --include=dev && npm run build` y arranca con `npm start`.
-5. Cuando termine:
-   - Entrá al servicio → **Environment** y copiá el valor generado de `AUTH_TOKEN`.
-   - Abrí `https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN` (guarda una cookie y te deja pasar).
-6. Listo: pestaña **WhatsApp** → QR o código de vinculación. La sesión queda en el disco persistente (`/var/data/sessions`).
+> `render.yaml` debe estar en la **rama por defecto** del repositorio: si todavía no mergeaste los cambios a `main`, Render leerá la versión vieja del archivo.
 
-### Qué crea el blueprint
+### A1 · Plan Free (funciona sin tarjeta)
+
+1. En [Render](https://dashboard.render.com) → **New +** → **Blueprint**.
+2. Conectá el repositorio y elegí la rama **main**. Render muestra el servicio `botforge` con `plan: free` y costo **US$ 0**.
+3. **Apply**. El build ejecuta `npm ci --include=dev && npm run build` y arranca con `npm start`.
+4. Al terminar, entrá al servicio → **Environment** → copiá el valor de **`AUTH_TOKEN`** (Render lo genera).
+5. Abrí `https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN`. Listo: podés crear bots, probar el simulador y vincular WhatsApp mientras el servicio esté despierto.
+
+**Qué incluye el blueprint**
 
 ```yaml
 services:
   - type: web
     name: botforge
-    plan: starter            # el disco persistente requiere plan pago
+    runtime: node            # campo actual (env: está deprecado)
+    plan: free               # sin tarjeta; Render acepta el blueprint tal cual
+    region: oregon
+    branch: main
     buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /api/health
+    envVars:
+      - { key: NODE_ENV, value: production }
+      - { key: NODE_VERSION, value: "22" }
+      - { key: AUTH_TOKEN, generateValue: true }
+      - { key: CORS_ORIGINS, value: "*" }
+      - { key: LOG_LEVEL, value: silent }
+      - { key: EPHEMERAL_DATA, value: "true" }   # avisa en la UI que no hay disco
+```
+
+**Límites reales del plan Free** (la interfaz los muestra en un aviso):
+
+| Límite | Consecuencia |
+| --- | --- |
+| Sin disco persistente | Los bots y la sesión de WhatsApp se pierden al reiniciar, redeployar o despertar |
+| Se duerme a los ~15 min sin tráfico | WhatsApp se desconecta y tarda ~1 min en volver |
+| 512 MB de RAM, 750 h/mes | Alcanza para un bot chico, no para mucho tráfico |
+
+> El blueprint marca `EPHEMERAL_DATA=true`, así que BotForge lo detecta y muestra el aviso en el panel y en la pestaña WhatsApp en vez de fallar en silencio.
+
+### A2 · Plan con disco (bot 24/7, ~US$ 7/mes)
+
+Con disco persistente la sesión de WhatsApp sobrevive reinicios y redeploys. En `render.yaml`:
+
+1. Cambiá `plan: free` por `plan: 0.5c-512mb` (el equivalente actual del antiguo `starter`).
+2. Agregá la variable `DATA_DIR` con `/var/data` y quitá `EPHEMERAL_DATA` (o ponela en `"false"`).
+3. Descomentá el bloque que ya está preparado en el archivo:
+
+```yaml
     disk:
       name: botforge-data
       mountPath: /var/data
       sizeGB: 1
-    envVars:
-      - key: DATA_DIR      # sesiones y base de datos en el disco
-        value: /var/data
-      - key: AUTH_TOKEN    # generado automáticamente
-        generateValue: true
-      - key: CORS_ORIGINS
-        value: "*"
 ```
 
-### Detalles importantes
+4. Commit + push. Render sincroniza el blueprint y pide confirmación del cambio de plan.
 
-- **Plan free:** no permite discos persistentes y el servicio se duerme por inactividad. Sirve para probar el editor, pero WhatsApp se desconecta y los bots se pierden al reiniciar. Para un bot real usá `starter` (o superior) con el disco.
-- **Un solo servicio hace todo:** interfaz, API, Socket.IO, WhatsApp y Teams. No hace falta configurar variables del frontend.
-- **Dominio propio:** Render → Settings → Custom Domains. Usá ese dominio como URL pública al configurar Teams.
-- **AUTH_TOKEN:** si querés desactivar la protección, borrá esa variable del dashboard (no recomendado en internet).
-- **Webhooks de Teams:** usá la URL de Render directamente, `https://TU-SERVICIO.onrender.com/api/teams/<botId>/messages`.
+Si ya creaste el servicio en free y no querés tocar el YAML: **Settings → Instance Type → Starter**, **Disks → Add Disk** (`/var/data`, 1 GB) y en **Environment** `DATA_DIR=/var/data` + `EPHEMERAL_DATA=false`.
+
+### A3 · Sin blueprint (todo a mano)
+
+**New + → Web Service** y completá:
+
+| Campo | Valor |
+| --- | --- |
+| Name | `botforge` |
+| Language / Runtime | **Node** |
+| Branch | `main` |
+| Build Command | `npm ci --include=dev && npm run build` |
+| Start Command | `npm start` |
+| Health Check Path | `/api/health` |
+| Instance Type | `Free` (prueba) o `Starter` (disco) |
+
+Variables: `NODE_ENV=production`, `NODE_VERSION=22`, `CORS_ORIGINS=*`, `LOG_LEVEL=silent`, `AUTH_TOKEN=<tu token>` y, si no hay disco, `EPHEMERAL_DATA=true`. Con disco: `DATA_DIR=/var/data` y `EPHEMERAL_DATA=false`.
+
+### Detalles comunes
+
+- **Un solo servicio hace todo:** interfaz, API, Socket.IO, WhatsApp y Teams. No configures variables `VITE_*`.
+- **Dominio propio:** Settings → Custom Domains; usá ese dominio para el endpoint de Teams.
+- **Webhooks de Teams:** `https://TU-SERVICIO.onrender.com/api/teams/<botId>/messages`.
+- **Mantener despierto el plan free (opcional):** un monitor externo (cron-job.org, UptimeRobot) que haga `GET /api/health` cada 10 minutos evita el spin-down, pero consume las 750 h/mes y no reemplaza al disco: un redeploy igual borra los datos.
+- **Auto-deploy:** activo por defecto; cada push a `main` redeploya.
 
 ---
 
@@ -138,6 +186,7 @@ También podés usar `railway up`, `fly launch` o cualquier host que ejecute un 
 | `CORS_ORIGINS` | `*` | Orígenes permitidos, separados por comas |
 | `PUBLIC_URL` | *(vacío)* | URL pública mostrada en la documentación |
 | `LOG_LEVEL` | `silent` | Logs de Baileys: `silent`, `info`, `debug` |
+| `EPHEMERAL_DATA` | *(auto)* | `true` avisa en la UI que no hay disco persistente (Render Free). El blueprint lo activa |
 | `NODE_ENV` | `development` | Usá `production` para servir la interfaz compilada |
 | `SERVERLESS` | *(auto)* | `1` fuerza modo sin canales persistentes. En Vercel se detecta solo |
 | `BACKEND_URL` | *(vacío)* | **Solo en Vercel**: backend al que proxear |
@@ -159,7 +208,7 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 
 - [ ] `AUTH_TOKEN` definido y guardado en un gestor de contraseñas.
 - [ ] HTTPS activo (Render y Vercel lo dan por defecto).
-- [ ] `DATA_DIR` apuntando a un disco persistente (Render) o volumen (Docker/VPS).
+- [ ] `DATA_DIR` apuntando a un disco persistente (Render) o volumen (Docker/VPS), con `EPHEMERAL_DATA` en `false`.
 - [ ] `CORS_ORIGINS` restringido si usás la API desde otro dominio.
 - [ ] Endpoint de Teams apuntando al backend persistente.
 - [ ] Número de WhatsApp dedicado, sin envíos masivos.
@@ -172,7 +221,11 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 | Síntoma | Causa / solución |
 | --- | --- |
 | El build de Render falla con «vite: not found» | `NODE_ENV=production` hace que npm omita devDependencies. El blueprint ya usa `npm ci --include=dev`. |
-| Render dice que el disco no está disponible | Los discos requieren plan pago. Cambiá `plan: starter` o quitá `disk` (sin persistencia). |
+| «disks are not supported for free tier services» | `disk:` junto a `plan: free` invalida todo el blueprint. Quitá el bloque (ya está comentado) o subí a `plan: 0.5c-512mb`. |
+| «This service requires a payment method» | El plan pedido es pago. Usá `plan: free` (este repo ya lo hace) o agregá una tarjeta para tener disco. |
+| «Invalid plan: starter» | Usá los IDs actuales: `free`, `0.5c-512mb`, `1c-2g`… (los legacy siguen existiendo, pero los IDs nuevos son los oficiales). |
+| El blueprint no toma los cambios | Render lee `render.yaml` de la rama por defecto. Mergeá a `main` o seleccioná la rama correcta al crear el blueprint. |
+| El panel avisa «Plan sin disco persistente» | Es el plan Free: los datos se borran al reiniciar. Pasá a A2 para persistencia real. |
 | WhatsApp se desconecta cada rato en Render | El plan free duerme el servicio. Usá un plan always-on con disco. |
 | `/api/health` funciona pero el panel devuelve 401 | Falta el token: abrí `https://tu-url/?token=TU_TOKEN` o definí `VITE_AUTH_TOKEN` (no recomendado). |
 | En Vercel el inicio de WhatsApp devuelve 501 | Es esperado: usá Render o configurá `BACKEND_URL` + `BACKEND_TOKEN`. |
