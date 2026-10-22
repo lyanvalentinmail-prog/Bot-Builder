@@ -96,7 +96,7 @@ npm start          # sirve interfaz + API en http://localhost:3001
 | **Vercel + Render** | UI en Vercel y proxy al backend | ✅ (QR por sondeo) | ✅ en Render |
 | **Docker / VPS** | Todo, con volumen propio | ✅ | ✅ |
 
-**Render:** New → Blueprint → conectá el repo (rama `main`) → Apply. El blueprint usa `plan: free`, así que Render lo acepta **sin pedir tarjeta**, genera un `AUTH_TOKEN` aleatorio y levanta todo en un servicio. Entrá con `https://tu-servicio.onrender.com/?token=…`.
+**Render:** New → Blueprint → conectá el repo (rama `main`) → Apply. El blueprint usa `plan: free`, así que Render lo acepta **sin pedir tarjeta** y levanta todo en un servicio. Entrá directo a `https://tu-servicio.onrender.com`: **no pide clave** (el blueprint no define `AUTH_TOKEN`). Si querés protegerlo, agregá `AUTH_TOKEN` en Environment — es opcional.
 
 - El plan Free no permite discos: el panel avisa y los datos se pierden al reiniciar (el archivo trae `EPHEMERAL_DATA=true`).
 - Para un bot 24/7 hay que pasar a `plan: 0.5c-512mb` y descomentar el bloque `disk:` — está preparado en `render.yaml` y explicado en [DEPLOY.md](./DEPLOY.md#a2--plan-con-disco-bot-247-us-7mes).
@@ -236,7 +236,7 @@ Copiá `.env.example` a `.env` (o definí las variables en el entorno):
 | `PORT` | `3001` | Puerto de la API / servidor de producción |
 | `HOST` | `0.0.0.0` | Interfaz de escucha |
 | `DATA_DIR` | `./data` | Carpeta de datos y sesiones |
-| `AUTH_TOKEN` | *(vacío)* | Si se define, protege panel y API con token (`?token=…` o cabecera `x-auth-token`) |
+| `AUTH_TOKEN` | *(vacío)* | **Opcional**: si está vacío no se pide clave. Si se define, protege panel y API (`?token=…` o cabecera `x-auth-token`) |
 | `PUBLIC_URL` | *(vacío)* | URL pública usada en enlaces/documentación |
 | `CORS_ORIGINS` | `*` | Orígenes permitidos para CORS (`*` o lista separada por comas) |
 | `LOG_LEVEL` | `silent` | Nivel de logs de Baileys (`info`, `debug`, `silent`) |
@@ -245,7 +245,7 @@ Copiá `.env.example` a `.env` (o definí las variables en el entorno):
 
 Variables del **build** del frontend (solo si la interfaz se sirve separada del backend, ej. Vercel → Render sin proxy): `VITE_API_URL`, `VITE_SOCKET_URL` y `VITE_AUTH_TOKEN` (esta última queda visible en el bundle: usala solo para demos).
 
-> ⚠️ Si exponés BotForge a internet, definí **siempre** `AUTH_TOKEN` y usá HTTPS.
+> ⚠️ Por defecto BotForge **no pide clave**. Si el panel queda expuesto en internet, es recomendable definir `AUTH_TOKEN` y usar HTTPS.
 
 ---
 
@@ -359,7 +359,7 @@ Cubren coincidencias de comandos (prefijo, alias, regex, alcances), variables y 
 ## Límites, seguridad y buenas prácticas
 
 - **Serverless (Vercel):** el editor y el simulador funcionan, pero WhatsApp/Teams reales requieren un servidor persistente con disco (Render o VPS). En Vercel los datos se guardan en `/tmp` y se reinician.
-- **No hay autenticación por defecto.** Pensado para uso local o detrás de una red privada. En internet, definí `AUTH_TOKEN` y HTTPS.
+- **No hay autenticación por defecto** (el blueprint de Render tampoco la activa). Pensado para uso local o detrás de una red privada. En internet, definí `AUTH_TOKEN` y HTTPS.
 - **WhatsApp no oficial:** Baileys usa el protocolo de WhatsApp Web. No está afiliado a Meta. Un uso abusivo (spam, envíos masivos, suplantación) puede provocar la suspensión del número.
 - **Un dispositivo por sesión:** cada bot mantiene su propia sesión. No vincules el mismo número en dos bots al mismo tiempo.
 - **Reacciones en Teams:** no soportadas por la API.

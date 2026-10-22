@@ -297,6 +297,10 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
             <code>{bot.id}</code>
           </div>
           <div className="kv">
+            <span>Acceso al panel</span>
+            <strong>{meta?.deploy?.access === 'protected' ? 'Protegido con clave' : 'Abierto, sin clave'}</strong>
+          </div>
+          <div className="kv">
             <span>Motor WhatsApp</span>
             <strong>Baileys</strong>
           </div>
@@ -312,6 +316,15 @@ export default function SettingsTab({ bot, setBot, patchBot, meta, notify, onBot
             <span>Reacciones enviadas</span>
             <strong>{bot.stats.reactions}</strong>
           </div>
+          {meta?.deploy?.access !== 'protected' && meta?.deploy?.publicUrl ? (
+            <div className="hint-box">
+              <Icon name="warning" size={15} />
+              <span>
+                El panel está abierto: cualquiera con la URL puede entrar. Para pedir una clave,
+                agregá <code>AUTH_TOKEN</code> en las variables del servicio (ver DEPLOY.md).
+              </span>
+            </div>
+          ) : null}
         </Card>
       </div>
 
