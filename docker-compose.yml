@@ -1,0 +1,16 @@
+services:
+  botforge:
+    build: .
+    container_name: botforge
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      DATA_DIR: /app/data
+      # Definí un token si el panel queda expuesto a internet
+      AUTH_TOKEN: ${AUTH_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-silent}
+    volumes:
+      - ./data:/app/data
