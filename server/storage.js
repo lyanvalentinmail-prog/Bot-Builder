@@ -1,13 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DB_FILE, DATA_DIR } from './config.js';
-import {
-  newBot,
-  seedBot,
-  makeCommand,
-  defaultSettings,
-  defaultAutoReact,
-} from './defaults.js';
+import { newBot, makeCommand, defaultSettings, defaultAutoReact } from './defaults.js';
+import { defaultMenu, normalizeMenu } from './menu.js';
+import { seedBot } from './templates.js';
 import { uid } from './util.js';
 
 function normalizeTexts(texts, fallback) {
@@ -52,6 +48,7 @@ function normalizeBot(raw) {
     updatedAt: raw.updatedAt || base.updatedAt,
     settings: { ...defaultSettings(), ...(raw.settings || {}) },
     autoReact: { ...defaultAutoReact(), ...(raw.autoReact || {}) },
+    menu: normalizeMenu(raw.menu, defaultMenu()),
     commands: Array.isArray(raw.commands) ? raw.commands.map(makeCommand) : [],
     reactions: normalizeReactions(raw.reactions, []),
     texts: normalizeTexts(raw.texts, []),

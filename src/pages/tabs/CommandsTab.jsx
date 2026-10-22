@@ -17,7 +17,7 @@ import {
 } from '../../components/ui.jsx';
 
 const MATCH_LABELS = {
-  command: 'Comando con prefijo (!menu)',
+  command: 'Comando con prefijo (.menu)',
   exact: 'Frase exacta',
   startsWith: 'Empieza con…',
   contains: 'Contiene…',
@@ -26,7 +26,7 @@ const MATCH_LABELS = {
 };
 
 const MATCH_HELP = {
-  command: 'Se activa con el prefijo del bot, por ejemplo !menu o !menu algo.',
+  command: 'Se activa con el prefijo del bot, por ejemplo .menu o .menu algo.',
   exact: 'Todo el mensaje debe coincidir exactamente. No hace falta el prefijo (aunque también lo acepta).',
   startsWith: 'El mensaje debe empezar con el disparador. Funciona con o sin prefijo.',
   contains: 'Se activa si el texto aparece en cualquier parte del mensaje.',
@@ -39,6 +39,7 @@ const REPLY_LABELS = {
   random: 'Frase al azar',
   image: 'Imagen con texto',
   buttons: 'Botones',
+  menu: 'Menú',
   none: 'Solo reacción',
 };
 
@@ -47,6 +48,7 @@ const MAX = { commands: 60, variants: 20, buttons: 10, aliases: 10 };
 const blankCommand = () => ({
   name: 'Nuevo comando',
   description: '',
+  category: 'General',
   trigger: 'nuevo',
   aliases: [],
   matchType: 'command',
@@ -113,6 +115,25 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
       (command.aliases || []).some((a) => a.toLowerCase().includes(q))
     );
   });
+
+  const grouped = useMemo(() => {
+    const groups = [];
+    for (const command of filtered) {
+      const name = command.category || 'General';
+      let group = groups.find((item) => item.name === name);
+      if (!group) {
+        group = { name, commands: [] };
+        groups.push(group);
+      }
+      group.commands.push(command);
+    }
+    return groups;
+  }, [filtered]);
+
+  const categories = useMemo(
+    () => [...new Set(bot.commands.map((command) => command.category || 'General'))],
+    [bot.commands],
+  );
 
   const dirty = selected ? JSON.stringify(draft) !== JSON.stringify(selected) : false;
 
@@ -289,36 +310,43 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
         </div>
 
         <div className="command-list">
-          {filtered.map((command) => (
-            <button
-              key={command.id}
-              className={`command-item ${command.id === selectedId ? 'is-active' : ''} ${
-                command.enabled ? '' : 'is-off'
-              }`}
-              onClick={() => setSelectedId(command.id)}
-            >
-              <span className="command-reaction">{command.reaction?.enabled ? command.reaction.emoji : '•'}</span>
-              <span className="command-item-body">
-                <span className="command-item-name">{command.name}</span>
-                <span className="command-item-trigger">
-                  {command.matchType === 'command'
-                    ? `${bot.settings.prefix}${command.trigger}`
-                    : command.trigger}
-                </span>
-              </span>
-              <span
-                className={`switch-mini ${command.enabled ? 'is-on' : ''}`}
-                title={command.enabled ? 'Activo' : 'Desactivado'}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  toggleEnabled(command);
-                }}
-                role="switch"
-                aria-checked={command.enabled}
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && toggleEnabled(command)}
-              />
-            </button>
+          {grouped.map((group) => (
+            <React.Fragment key={group.name}>
+              <span className="command-group-label">{group.name}</span>
+              {group.commands.map((command) => (
+                <button
+                  key={command.id}
+                  className={`command-item ${command.id === selectedId ? 'is-active' : ''} ${
+                    command.enabled ? '' : 'is-off'
+                  }`}
+                  onClick={() => setSelectedId(command.id)}
+                >
+                  <span className="command-reaction">
+                    {command.reaction?.enabled ? command.reaction.emoji : '•'}
+                  </span>
+                  <span className="command-item-body">
+                    <span className="command-item-name">{command.name}</span>
+                    <span className="command-item-trigger">
+                      {command.matchType === 'command'
+                        ? `${bot.settings.prefix}${command.trigger}`
+                        : command.trigger}
+                    </span>
+                  </span>
+                  <span
+                    className={`switch-mini ${command.enabled ? 'is-on' : ''}`}
+                    title={command.enabled ? 'Activo' : 'Desactivado'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleEnabled(command);
+                    }}
+                    role="switch"
+                    aria-checked={command.enabled}
+                    tabIndex={0}
+                    onKeyDown={(e) => e.key === 'Enter' && toggleEnabled(command)}
+                  />
+                </button>
+              ))}
+            </React.Fragment>
           ))}
           {!filtered.length ? (
             <div className="muted small pad">No hay comandos que coincidan.</div>
@@ -403,6 +431,24 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
                   </Select>
                 </Field>
               </div>
+
+              <Field
+                label="Categoría del menú"
+                hint="Agrupa el comando dentro del menú (ej: Descargas, Stickers)"
+              >
+                <Input
+                  list="command-categories"
+                  value={draft.category || ''}
+                  maxLength={40}
+                  onChange={(e) => update({ category: e.target.value })}
+                  placeholder="Descargas"
+                />
+                <datalist id="command-categories">
+                  {categories.map((category) => (
+                    <option key={category} value={category} />
+                  ))}
+                </datalist>
+              </Field>
               <p className="help-text">{MATCH_HELP[draft.matchType]}</p>
 
               <Field
@@ -515,6 +561,16 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
                   ))}
                 </div>
               </div>
+
+              {draft.reply.type === 'menu' ? (
+                <div className="hint-box">
+                  <Icon name="info" size={16} />
+                  <span>
+                    Este comando envía el menú que se edita en la pestaña <strong>Menú</strong>: se
+                    arma con los comandos activos, sus categorías y el banner.
+                  </span>
+                </div>
+              ) : null}
 
               {(draft.reply.type === 'text' || draft.reply.type === 'buttons') && (
                 <>
@@ -641,7 +697,7 @@ export default function CommandsTab({ bot, setBot, meta, notify, onBotReload }) 
                           next[index] = { ...next[index], command: e.target.value };
                           updateReply({ buttons: next });
                         }}
-                        placeholder="!menu"
+                        placeholder=".menu"
                       />
                       <button
                         type="button"

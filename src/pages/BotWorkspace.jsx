@@ -10,6 +10,7 @@ import TextsTab from './tabs/TextsTab.jsx';
 import WhatsAppTab from './tabs/WhatsAppTab.jsx';
 import GroupsTab from './tabs/GroupsTab.jsx';
 import SettingsTab from './tabs/SettingsTab.jsx';
+import MenuTab from './tabs/MenuTab.jsx';
 
 export default function BotWorkspace() {
   const { botId, tab = 'commands' } = useParams();
@@ -118,6 +119,7 @@ export default function BotWorkspace() {
   const tabs = useMemo(
     () => [
       { id: 'commands', label: 'Comandos', icon: 'command', badge: bot?.commands.length },
+      { id: 'menu', label: 'Menú', icon: 'grid' },
       { id: 'reactions', label: 'Reacciones', icon: 'smile', badge: bot?.reactions.length },
       { id: 'texts', label: 'Textos', icon: 'text', badge: bot?.texts.length },
       { id: 'whatsapp', label: 'WhatsApp', icon: 'whatsapp' },
@@ -204,6 +206,9 @@ export default function BotWorkspace() {
       <div className="workspace-body">
         {tab === 'commands' && (
           <CommandsTab bot={bot} setBot={setBot} meta={meta} notify={notify} onBotReload={load} />
+        )}
+        {tab === 'menu' && (
+          <MenuTab bot={bot} setBot={setBot} meta={meta} notify={notify} />
         )}
         {tab === 'reactions' && (
           <ReactionsTab bot={bot} setBot={setBot} notify={notify} patchBot={patchBot} />

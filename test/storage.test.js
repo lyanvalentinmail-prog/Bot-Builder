@@ -17,7 +17,7 @@ test('crea la base con un bot de ejemplo', () => {
 
 test('crea, edita, duplica y elimina bots', () => {
   const store = new Store(tmpFile());
-  const bot = store.createBot({ name: 'Soporte', template: 'support' });
+  const bot = store.createBot({ name: 'Soporte', template: 'media' });
   assert.equal(bot.name, 'Soporte');
   assert.ok(bot.commands.some((c) => c.trigger === 'menu'));
 

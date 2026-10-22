@@ -4,7 +4,7 @@
 
 BotForge es una aplicación web completa (frontend + backend + motores de mensajería) donde podés:
 
-- 🤖 Crear bots desde plantillas: atención al cliente, tienda, comunidad, eventos o desde cero.
+- 🤖 Crear bots desde plantillas: instalación multimedia con 30 comandos o desde cero.
 - 💬 Definir comandos con prefijo, frases exactas, palabras clave, expresiones regulares o «cualquier mensaje».
 - 😀 Editar **reacciones**: emojis automáticos, reacciones por palabra clave, comando, grupo, privado o mención, con probabilidad, alcance y borrado automático.
 - ✍️ Crear y reutilizar **plantillas de texto** (`{{texto:horario}}`) con variables dinámicas (`{{nombre}}`, `{{hora}}`, `{{lista_comandos}}`…).
@@ -116,16 +116,25 @@ npm start          # sirve interfaz + API en http://localhost:3001
 
 ### 1. Crear un bot
 
-En **Registrar** elegí una plantilla:
+En **Registrar** elegí una instancia:
 
-| Plantilla | Incluye |
+| Instancia | Incluye |
 | --- | --- |
-| Asistente general | Menú, ping, saludos, info y plantillas base |
-| Atención al cliente | Horarios, precios, envíos, derivación a humano y respaldo |
-| Tienda y catálogo | Catálogo, promos, cómo comprar, toma de pedidos y botones |
-| Comunidad y grupos | Reglas, bienvenida, links y advertencias (acepta grupos) |
-| Eventos | Programa, ubicación e inscripción con botones |
-| Desde cero | Un menú mínimo para armar todo a medida |
+| Multimedia y descargas | 30 comandos agrupados en 6 categorías + menú editable |
+| Desde cero | Sin comandos, para armar todo a medida |
+
+**Los 30 comandos** (prefijo `.`) vienen listos para editar:
+
+| Categoría | Comandos |
+| --- | --- |
+| Descargas | `.tiktok` `.instagram` `.pinterest` `.ytmp3` `.ytmp4` `.facebook` `.twitter` `.spotify` `.mediafire` `.play` |
+| Stickers | `.sticker` `.brat` `.attp` `.ttp` `.gif` `.emojimix` `.search` `.searchpack` `.take` |
+| Conversión | `.toimg` `.tovideo` `.tomp3` `.toaudio` `.togif` |
+| Packs | `.pack` |
+| Inteligencia artificial | `.gemini` `.chatgpt` `.deepseek` |
+| Información | `.help` `.debug` |
+
+Además el bot responde `.menu`, que envía el menú con todos esos comandos agrupados.
 
 ### 2. Comandos
 
@@ -142,7 +151,20 @@ Cada comando tiene:
 
 El botón **Probar** ejecuta el motor real contra el comando que estás editando y muestra el resultado (coincidencia, reacciones, respuestas).
 
-### 3. Reacciones
+### 3. Menú
+
+La pestaña **Menú** edita lo que el bot envía al recibir `.menu`:
+
+- **Automático:** se arma solo con los comandos activos, agrupados por su **categoría** y numerados `01`, `02`… Cada comando aparece como `.disparador` con su descripción `> …`.
+- **Manual:** escribís el menú a mano. Mientras escribís, los comandos que existen se marcan en violeta, los que no existen en rojo, y los parámetros entre llaves en cian.
+- **Parámetros:** `{usuario}`, `{bot}`, `{equipo}`, `{prefijo}`, `{estado}`, `{version}`, `{grupo}`, `{hora}`, `{fecha}`, `{comando}`, `{total}`, `{ayuda}` y `{comandos}` (bloque completo de comandos). Se insertan con un clic.
+- **Datos del menú:** filas `Etiqueta: valor` del bloque « INFORMACIÓN » (hasta 10).
+- **Banner:** URL pública de una imagen; cuando está configurada, el menú se envía como imagen con el texto como pie.
+- **Vista previa:** la genera el mismo código que usa el bot, así que es exactamente lo que recibe el grupo.
+
+La categoría de cada comando se edita en la pestaña **Comandos** y define en qué grupo del menú aparece.
+
+### 4. Reacciones
 
 - **Reacción automática:** elegís varios emojis, la probabilidad (0–100 %), el alcance (todos / grupos), si también reacciona a comandos y si se quita luego de N segundos.
 - **Reacciones personalizadas:** reglas con nombre, emoji y condición:
@@ -155,11 +177,11 @@ El botón **Probar** ejecuta el motor real contra el comando que estás editando
 
 WhatsApp reemplaza la reacción anterior: el bot envía **una** reacción por mensaje (se prioriza la del comando).
 
-### 4. Textos
+### 5. Textos
 
 Guardá fragmentos reutilizables (horarios, dirección, medios de pago…) y usalos en cualquier respuesta con `{{texto:slug}}`. Se pueden anidar con variables y otras plantillas.
 
-### 5. Ajustes
+### 6. Ajustes
 
 Prefijo, exigir prefijo, distinguir mayúsculas, responder solo si mencionan al bot, acuses de lectura, aviso de comando desconocido, respuesta de respaldo, bienvenida al primer contacto y firma. También podés exportar/importar y eliminar el bot.
 
@@ -292,6 +314,9 @@ Todas las rutas cuelgan de `/api`.
 | POST | `/bots/:id/commands/:commandId/duplicate` | Duplica un comando |
 | POST | `/bots/:id/commands/reorder` | Reordena (`{ order: [ids] }`) |
 | POST/PUT/DELETE | `/bots/:id/texts[/:textId]` | CRUD de plantillas de texto |
+| PUT | `/bots/:id/menu` | Guarda el menú (modo, banner, datos y texto manual) |
+| POST | `/bots/:id/menu/preview` | Devuelve el menú renderizado y los comandos detectados |
+| POST | `/bots/:id/menu/reset` | Restaura el menú por defecto |
 | POST/PUT/DELETE | `/bots/:id/reactions[/:reactionId]` | CRUD de reacciones |
 | POST | `/bots/:id/simulate` | Simula un mensaje de grupo (`{ text, name }`) y cuenta el uso |
 | GET | `/bots/:id/whatsapp` | Estado de la conexión |
@@ -357,7 +382,8 @@ Cubren coincidencias de comandos (prefijo, alias, regex, alcance de grupo), vari
 - **WhatsApp no oficial:** Baileys usa el protocolo de WhatsApp Web. No está afiliado a Meta. Un uso abusivo (spam, envíos masivos, suplantación) puede provocar la suspensión del número.
 - **Un dispositivo por sesión:** cada bot mantiene su propia sesión. No vincules el mismo número en dos bots al mismo tiempo.
 - **Solo grupos:** los mensajes privados se descartan; no hay modo de atención 1 a 1.
-- **Límites del editor:** 60 comandos, 40 reacciones, 40 plantillas, 10 alias y 10 botones por comando.
+- **Límites del editor:** 60 comandos, 40 reacciones, 40 plantillas, 10 alias, 10 botones por comando y 10 filas de información en el menú.
+- **Menú:** `.menu` se genera con los comandos activos (30 en la instancia multimedia); si hay banner se envía como imagen con el texto como pie.
 - **Mensajes de voz, archivos y catálogos:** el bot responde a texto (incluye pies de foto y respuestas de botones). No procesa audios ni adjuntos.
 - **Respaldo:** `data/` contiene las credenciales de WhatsApp y la base. Guardalo en un volumen seguro y no lo subas a Git (ya está en `.gitignore`).
 

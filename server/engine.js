@@ -1,4 +1,5 @@
 import { normalize, render, commandListMarkup } from './template.js';
+import { buildMenuActions } from './menu.js';
 import { escapeRegExp, randomOf } from './util.js';
 
 /** ¿El mensaje corresponde al trigger del comando? Devuelve verdadero/falso. */
@@ -172,6 +173,22 @@ export function buildReplyActions(bot, command, vars) {
   const text = render(reply.text || '', vars);
   const actions = [];
   const type = reply.type || 'text';
+
+  if (type === 'menu') {
+    // El menú se genera con los comandos actuales del bot (y su banner).
+    return buildMenuActions(
+      bot,
+      {
+        name: vars.nombre,
+        groupName: vars.grupo,
+        time: vars.hora,
+        dateString: vars.fecha,
+        command: vars.comando,
+        channel: vars.canal,
+      },
+      command,
+    );
+  }
 
   if (type === 'image') {
     const caption = render(reply.caption || reply.text || '', vars);
