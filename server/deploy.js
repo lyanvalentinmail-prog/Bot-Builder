@@ -27,6 +27,7 @@ export function deployInfo({
 
   return {
     mode,
+    access: authToken ? 'protected' : 'open',
     serverless: Boolean(serverless),
     ephemeral,
     persistentChannels: !serverless,

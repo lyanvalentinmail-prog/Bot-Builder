@@ -27,8 +27,10 @@ BotForge incluye **blueprints listos** para Render y Vercel. Elegí según lo qu
 1. En [Render](https://dashboard.render.com) → **New +** → **Blueprint**.
 2. Conectá el repositorio y elegí la rama **main**. Render muestra el servicio `botforge` con `plan: free` y costo **US$ 0**.
 3. **Apply**. El build ejecuta `npm ci --include=dev && npm run build` y arranca con `npm start`.
-4. Al terminar, entrá al servicio → **Environment** → copiá el valor de **`AUTH_TOKEN`** (Render lo genera).
-5. Abrí `https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN`. Listo: podés crear bots, probar el simulador y vincular WhatsApp mientras el servicio esté despierto.
+4. Abrí `https://TU-SERVICIO.onrender.com` directamente. **No pide clave**: el blueprint no define `AUTH_TOKEN`, así que el panel arranca abierto.
+5. Listo: podés crear bots, probar el simulador y vincular WhatsApp mientras el servicio esté despierto.
+
+> ¿Querés que pida una clave? Es opcional: en **Environment** agregá `AUTH_TOKEN` con tu clave y guardá. Después entrá una vez con `https://TU-SERVICIO.onrender.com/?token=TU_CLAVE` (queda una cookie) o mandá `x-auth-token` en la API.
 
 **Qué incluye el blueprint**
 
@@ -46,7 +48,7 @@ services:
     envVars:
       - { key: NODE_ENV, value: production }
       - { key: NODE_VERSION, value: "22" }
-      - { key: AUTH_TOKEN, generateValue: true }
+      # sin AUTH_TOKEN: el panel queda abierto, sin clave
       - { key: CORS_ORIGINS, value: "*" }
       - { key: LOG_LEVEL, value: silent }
       - { key: EPHEMERAL_DATA, value: "true" }   # avisa en la UI que no hay disco
@@ -95,7 +97,9 @@ Si ya creaste el servicio en free y no querés tocar el YAML: **Settings → Ins
 | Health Check Path | `/api/health` |
 | Instance Type | `Free` (prueba) o `Starter` (disco) |
 
-Variables: `NODE_ENV=production`, `NODE_VERSION=22`, `CORS_ORIGINS=*`, `LOG_LEVEL=silent`, `AUTH_TOKEN=<tu token>` y, si no hay disco, `EPHEMERAL_DATA=true`. Con disco: `DATA_DIR=/var/data` y `EPHEMERAL_DATA=false`.
+Variables: `NODE_ENV=production`, `NODE_VERSION=22`, `CORS_ORIGINS=*`, `LOG_LEVEL=silent` y, si no hay disco, `EPHEMERAL_DATA=true`. Con disco: `DATA_DIR=/var/data` y `EPHEMERAL_DATA=false`.
+
+No hace falta `AUTH_TOKEN`: sin esa variable el panel y la API quedan **abiertos, sin clave**. Agregala solo si querés protegerlos.
 
 ### Detalles comunes
 
@@ -182,7 +186,7 @@ También podés usar `railway up`, `fly launch` o cualquier host que ejecute un 
 | `PORT` | `3001` | Puerto HTTP (Render/Vercel lo inyectan) |
 | `HOST` | `0.0.0.0` | Interfaz de escucha |
 | `DATA_DIR` | `./data` (`/tmp/botforge` en serverless) | Base de datos y sesiones de WhatsApp |
-| `AUTH_TOKEN` | *(vacío)* | Protege panel y API. Se envía por `?token=`, cookie, `x-auth-token` o `Bearer` |
+| `AUTH_TOKEN` | *(vacío)* | **Opcional.** Si está vacío no se pide ninguna clave. Si lo definís, protege panel y API (`?token=`, cookie, `x-auth-token` o `Bearer`) |
 | `CORS_ORIGINS` | `*` | Orígenes permitidos, separados por comas |
 | `PUBLIC_URL` | *(vacío)* | URL pública mostrada en la documentación |
 | `LOG_LEVEL` | `silent` | Logs de Baileys: `silent`, `info`, `debug` |
@@ -206,7 +210,7 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 
 ## Checklist de producción
 
-- [ ] `AUTH_TOKEN` definido y guardado en un gestor de contraseñas.
+- [ ] ¿Panel público? Definí `AUTH_TOKEN` (opcional; por defecto va sin clave) y guardalo en un gestor de contraseñas.
 - [ ] HTTPS activo (Render y Vercel lo dan por defecto).
 - [ ] `DATA_DIR` apuntando a un disco persistente (Render) o volumen (Docker/VPS), con `EPHEMERAL_DATA` en `false`.
 - [ ] `CORS_ORIGINS` restringido si usás la API desde otro dominio.
@@ -227,8 +231,9 @@ En Render todo-en-uno o en Vercel con proxy **no hace falta ninguna variable `VI
 | El blueprint no toma los cambios | Render lee `render.yaml` de la rama por defecto. Mergeá a `main` o seleccioná la rama correcta al crear el blueprint. |
 | El panel avisa «Plan sin disco persistente» | Es el plan Free: los datos se borran al reiniciar. Pasá a A2 para persistencia real. |
 | WhatsApp se desconecta cada rato en Render | El plan free duerme el servicio. Usá un plan always-on con disco. |
-| `/api/health` funciona pero el panel devuelve 401 | Falta el token: abrí `https://tu-url/?token=TU_TOKEN` o definí `VITE_AUTH_TOKEN` (no recomendado). |
+| El panel devuelve 401 | Definiste `AUTH_TOKEN`. Abrí `https://tu-url/?token=TU_CLAVE` o mandá `x-auth-token`. Para que no pida clave, borrá esa variable y redeployá. |
 | En Vercel el inicio de WhatsApp devuelve 501 | Es esperado: usá Render o configurá `BACKEND_URL` + `BACKEND_TOKEN`. |
+| Quiero que no pida clave | No definas `AUTH_TOKEN` (el blueprint ya no lo genera). Si lo habías agregado, borralo en Environment y redeployá. |
 | En Vercel todo se reinicia solo | El disco es efímero (`/tmp`). Pasá al modo proxy con Render. |
 | El proxy de Vercel devuelve 502 | `BACKEND_URL` mal escrita, backend dormido o token inválido. Probá `https://tu-backend.onrender.com/api/health`. |
 | Teams no recibe mensajes en el modo C | Configurá el endpoint de Teams con la URL de Render, no la de Vercel. |

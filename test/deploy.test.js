@@ -12,6 +12,7 @@ test('servidor persistente: canales y datos disponibles', () => {
   assert.equal(info.persistentChannels, true);
   assert.equal(info.persistentData, true);
   assert.equal(info.warning, null);
+  assert.equal(info.access, 'open');
   assert.match(info.hint, /vincular|vincular/i);
 });
 
@@ -34,6 +35,7 @@ test('serverless: canales reales bloqueados', () => {
   assert.equal(info.ephemeral, true);
   assert.equal(info.persistentChannels, false);
   assert.equal(info.authRequired, true);
+  assert.equal(info.access, 'protected');
   assert.match(info.hint, /Render/);
   assert.match(info.warning, /\/tmp/);
 });
@@ -54,6 +56,8 @@ test('el blueprint de Render no pide disco en el plan free', () => {
   assert.match(activeLines, /startCommand: npm start/);
   assert.match(activeLines, /healthCheckPath: \/api\/health/);
   assert.match(activeLines, /EPHEMERAL_DATA/);
+  // Sin clave por defecto: el blueprint no declara AUTH_TOKEN activo.
+  assert.doesNotMatch(activeLines, /key: AUTH_TOKEN/);
   // El archivo debe estar en la raíz del repositorio.
   assert.ok(fs.existsSync(path.join(process.cwd(), 'render.yaml')));
 });

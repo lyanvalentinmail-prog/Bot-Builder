@@ -2,8 +2,10 @@
 #
 # Cómo desplegar:
 #   1. Render → New + → Blueprint → elegí este repositorio (rama main) → Apply.
-#   2. Cuando termine el deploy, abrí el servicio → Environment y copiá AUTH_TOKEN.
-#   3. Entrá a https://TU-SERVICIO.onrender.com/?token=ESE_TOKEN
+#   2. Cuando termine el deploy, abrí https://TU-SERVICIO.onrender.com
+#      (no pide clave: el acceso al panel queda abierto).
+#   3. Opcional: si querés protegerlo con una clave, agregá AUTH_TOKEN en
+#      Environment (ver el bloque comentado al final del archivo).
 #
 # Qué hace este archivo:
 #   - Crea un único servicio web que sirve la interfaz, la API, Socket.IO,
@@ -43,8 +45,8 @@ services:
         value: production
       - key: NODE_VERSION
         value: "22"
-      - key: AUTH_TOKEN
-        generateValue: true
+      # Sin AUTH_TOKEN: el panel y la API quedan abiertos, sin clave.
+      # Para protegerlos, agregá la variable AUTH_TOKEN (ver al final).
       - key: CORS_ORIGINS
         value: "*"
       - key: LOG_LEVEL
@@ -67,7 +69,13 @@ services:
     #     value: /var/data
     #   # y quitar EPHEMERAL_DATA (o ponerlo en "false")
     #
-    # ── Secretos que conviene cargar a mano ─────────────────────────────────
-    # Para pedir valores en el dashboard al crear el servicio usá:
+    # ── Clave de acceso opcional ────────────────────────────────────────────
+    # Por defecto NO se pide clave. Si el panel va a quedar expuesto en internet
+    # y querés protegerlo, descomentá estas líneas y poné tu propia clave:
+    #
     #   - key: AUTH_TOKEN
-    #     sync: false
+    #     sync: false      # Render te la pide al crear el servicio
+    #
+    # O definila directo en el dashboard: Environment → AUTH_TOKEN → Save.
+    # Después entrá una vez con https://TU-SERVICIO.onrender.com/?token=TU_CLAVE
+    # (guarda una cookie) o mandá la cabecera x-auth-token en la API.
