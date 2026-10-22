@@ -1,7 +1,8 @@
 import { uid } from './util.js';
+import { defaultMenu, normalizeMenu } from './menu.js';
 
 export const MATCH_TYPES = ['command', 'exact', 'contains', 'startsWith', 'regex', 'any'];
-export const REPLY_TYPES = ['text', 'random', 'image', 'buttons', 'none'];
+export const REPLY_TYPES = ['text', 'random', 'image', 'buttons', 'menu', 'none'];
 export const SCOPES = ['all', 'group'];
 
 export const defaultSettings = () => ({
@@ -59,6 +60,10 @@ export const makeCommand = (data = {}) => ({
   id: data.id || uid('cmd_'),
   name: typeof data.name === 'string' && data.name.trim() ? data.name.trim().slice(0, 80) : 'Comando',
   description: typeof data.description === 'string' ? data.description.slice(0, 240) : '',
+  category:
+    typeof data.category === 'string' && data.category.trim()
+      ? data.category.trim().slice(0, 40)
+      : 'General',
   trigger:
     typeof data.trigger === 'string' && data.trigger.trim()
       ? data.trigger.trim().slice(0, 120)
@@ -237,6 +242,7 @@ export const newBot = (data = {}) => {
     updatedAt: stamp,
     settings: { ...defaultSettings(), ...(data.settings || {}) },
     autoReact: { ...defaultAutoReact(), ...(data.autoReact || {}) },
+    menu: normalizeMenu(data.menu, defaultMenu()),
     commands: Array.isArray(data.commands) ? data.commands.map(makeCommand) : defaultCommands(),
     reactions: Array.isArray(data.reactions) ? data.reactions : defaultReactions(),
     texts: Array.isArray(data.texts) ? data.texts : defaultTexts(),
@@ -252,15 +258,4 @@ export const newBot = (data = {}) => {
     },
     stats: { messages: 0, replies: 0, reactions: 0, lastActiveAt: null },
   };
-};
-
-export const seedBot = () => {
-  const bot = newBot({
-    name: 'Asistente del grupo',
-    emoji: '💬',
-    description:
-      'Bot de ejemplo para grupos: comandos, reacciones y plantillas listas para personalizar.',
-    template: 'starter',
-  });
-  return bot;
 };

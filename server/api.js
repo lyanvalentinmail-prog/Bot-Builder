@@ -1,7 +1,14 @@
 import express from 'express';
 import { store } from './storage.js';
 import { whatsapp } from './whatsapp.js';
-import { TEMPLATES, getTemplate } from './templates.js';
+import { TEMPLATES, DEFAULT_TEMPLATE, getTemplate } from './templates.js';
+import {
+  MENU_PARAMS,
+  defaultMenu,
+  normalizeMenu,
+  menuPreview,
+  menuCommands,
+} from './menu.js';
 import { CATALOG, CATALOG_BY_ID, CATALOG_CATEGORIES, publicCatalog } from './catalog.js';
 import { processMessage, extractCommandName, findCommand } from './engine.js';
 import {
@@ -163,10 +170,15 @@ api.get('/meta', (req, res) => {
     version: '1.0.0',
     variables: VARIABLES,
     templates: TEMPLATES.map(({ build, ...rest }) => rest),
+    menu: {
+      params: MENU_PARAMS,
+      defaults: defaultMenu(),
+      boxWidth: 20,
+    },
     matchTypes: MATCH_TYPES,
     replyTypes: REPLY_TYPES,
     scopes: SCOPES,
-    limits: { commands: 60, reactions: 40, texts: 40, aliases: 10 },
+    limits: { commands: 60, reactions: 40, texts: 40, aliases: 10, menuInfo: 10 },
     whatsappEngine: 'Baileys (WhatsApp Web multi-dispositivo)',
     scope: 'groups',
     catalog: { categories: CATALOG_CATEGORIES, total: CATALOG.length },
@@ -188,7 +200,7 @@ api.get('/bots', (req, res) => {
 });
 
 api.post('/bots', (req, res) => {
-  const template = getTemplate(req.body?.template) || getTemplate('starter');
+  const template = getTemplate(req.body?.template) || getTemplate(DEFAULT_TEMPLATE);
   const data = template.build();
   if (typeof req.body?.name === 'string' && req.body.name.trim()) {
     data.name = req.body.name.trim().slice(0, 60);
@@ -239,6 +251,35 @@ api.get('/bots/:id/export', requireBot, (req, res) => {
     exportedAt: new Date().toISOString(),
     bot: config,
   });
+});
+
+/* ----------------------------- menú ----------------------------- */
+
+api.put('/bots/:id/menu', requireBot, (req, res) => {
+  req.bot.menu = normalizeMenu(req.body, req.bot.menu);
+  store.saveBot(req.bot);
+  res.json({ menu: req.bot.menu, bot: publicBot(req.bot) });
+});
+
+api.post('/bots/:id/menu/preview', requireBot, (req, res) => {
+  const ctx = {
+    name: asString(req.body?.name, 60).trim() || 'Ana',
+    groupName: asString(req.body?.groupName, 60).trim() || 'Grupo Ventas',
+    command: 'menu',
+  };
+  const preview = menuPreview(req.bot, ctx, req.body?.menu);
+  const draft = { ...req.bot, menu: preview.menu };
+  res.json({
+    ...preview,
+    total: menuCommands(draft).length,
+    commandsInBot: req.bot.commands.length,
+  });
+});
+
+api.post('/bots/:id/menu/reset', requireBot, (req, res) => {
+  req.bot.menu = normalizeMenu({}, defaultMenu());
+  store.saveBot(req.bot);
+  res.json({ menu: req.bot.menu, bot: publicBot(req.bot) });
 });
 
 api.post('/bots/import', (req, res) => {

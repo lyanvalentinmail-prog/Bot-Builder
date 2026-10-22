@@ -62,7 +62,7 @@ test('flujo de bot: crear, simular y exportar', async () => {
   const created = await get('/api/bots', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ template: 'support', name: 'API Test' }),
+    body: JSON.stringify({ template: 'media', name: 'API Test' }),
   });
   assert.equal(created.status, 201);
   const { bot } = await created.json();
@@ -72,11 +72,11 @@ test('flujo de bot: crear, simular y exportar', async () => {
   const simulated = await get(`/api/bots/${bot.id}/simulate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text: '!horario', name: 'Ana' }),
+    body: JSON.stringify({ text: '.tiktok https://www.tiktok.com/@a/video/1', name: 'Ana' }),
   });
   const result = await simulated.json();
   assert.equal(result.matched, true);
-  assert.match(result.actions[0].text, /horario/i);
+  assert.match(result.actions[0].text, /tiktok/i);
 
   const exported = await get(`/api/bots/${bot.id}/export`);
   assert.equal(exported.status, 200);
@@ -108,7 +108,7 @@ test('el catálogo expone comandos e instalarlos crea el comando real', async ()
     await get('/api/bots', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template: 'starter', name: 'Catálogo Test' }),
+      body: JSON.stringify({ template: 'media', name: 'Catálogo Test' }),
     })
   ).json();
   const botId = created.bot.id;
@@ -125,7 +125,7 @@ test('el catálogo expone comandos e instalarlos crea el comando real', async ()
     await get(`/api/bots/${botId}/simulate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: '!reglas' }),
+      body: JSON.stringify({ text: '.reglas' }),
     })
   ).json();
   assert.equal(simulated.matched, true);

@@ -92,7 +92,7 @@ export default function Home() {
             </ul>
             <p className="info-paragraph info-paragraph-soft">
               Sumá el bot a un grupo, dale permisos de administrador opcionales y escribí{' '}
-              <strong>!menu</strong> para verlo trabajar.
+              <strong>.menu</strong> para verlo trabajar.
             </p>
           </>
         ),

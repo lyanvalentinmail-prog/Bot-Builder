@@ -10,7 +10,7 @@ export const EXAMPLE_VARS = {
   fecha_larga: 'jueves 22 de octubre de 2026',
   grupo: 'Equipo Ventas',
   canal: 'WhatsApp',
-  lista_comandos: '• *!menu* — Lista de ayuda\n• *!ping* — Comprueba que el bot está en línea',
+  lista_comandos: '• *.menu* — Menú de comandos\n• *.tiktok* — Descarga videos de TikTok',
 };
 
 const VAR_REGEX = /\{\{\s*([a-zA-Z0-9_:.\-]+)\s*\}\}/g;

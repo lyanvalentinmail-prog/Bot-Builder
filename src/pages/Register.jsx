@@ -44,7 +44,7 @@ export default function Register() {
   const [meta, setMeta] = useState(null);
   const [botsCount, setBotsCount] = useState(0);
   const [step, setStep] = useState(1);
-  const [templateId, setTemplateId] = useState('starter');
+  const [templateId, setTemplateId] = useState('media');
   const [listOpen, setListOpen] = useState(false);
   const [phone, setPhone] = useState('');
   const [method, setMethod] = useState('pairing');
@@ -72,7 +72,7 @@ export default function Register() {
       .then(([metaData, botsData]) => {
         setMeta(metaData);
         setBotsCount(botsData.bots.length);
-        const first = metaData.templates?.find((item) => item.id === 'starter') || metaData.templates?.[0];
+        const first = metaData.templates?.find((item) => item.id === 'media') || metaData.templates?.[0];
         if (first) {
           setTemplateId(first.id);
           setName(first.name);
@@ -468,7 +468,7 @@ export default function Register() {
                   <strong>¡WhatsApp conectado!</strong>
                   <p>
                     «{bot?.name}» ya está vinculado. Sumá el número al grupo y escribí{' '}
-                    <code>!menu</code>.
+                    <code>.menu</code>.
                   </p>
                 </div>
               </div>
